@@ -1,0 +1,22 @@
+[package]
+name = "fontmesh"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Pure Rust library for converting TrueType font glyphs to 2D/3D triangle meshes"
+keywords = ["font", "mesh", "ttf", "truetype", "triangulation"]
+categories = ["graphics", "game-development", "rendering"]
+
+[dependencies]
+ttf-parser = "0.24"
+glam = "0.30"
+lyon_tessellation = "1.0"
+serde = { version = "1.0", optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
+
+[features]
+default = []
+serde = ["dep:serde", "glam/serde"]
