@@ -2,7 +2,7 @@
 name = "fontmesh"
 version = "0.1.0"
 edition = "2021"
-authors = ["Po Hsuan Lai <pohsuanlai@gmail.com>"]
+authors = ["Po Hsuan Lai <pohsuanlai0208@gmail.com>"]
 license = "MIT"
 description = "Pure Rust library for converting TrueType font glyphs to 2D/3D triangle meshes"
 repository = "https://github.com/PoHsuanLai/fontmesh"
