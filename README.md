@@ -54,26 +54,6 @@ cargo run --example buffer_reuse
 cargo run --example export_obj
 ```
 
-## Quality Levels
-
-- `Quality::Low` - 10 subdivisions (fastest)
-- `Quality::Normal` - 20 subdivisions (balanced)
-- `Quality::High` - 50 subdivisions (smoothest)
-- `Quality::Custom(n)` - Custom subdivision count
-
-## Buffer Reuse
-
-For processing multiple glyphs, reuse buffers to avoid allocations:
-
-```rust
-let mut mesh = Mesh2D::new();
-
-for c in "Hello".chars() {
-    font.glyph_to_mesh_2d_reuse(c, Quality::Normal, &mut mesh)?;
-    // Use mesh...
-}
-```
-
 ## How It Works
 
 1. Parse font with ttf-parser
