@@ -28,9 +28,13 @@ let mesh_3d = font.glyph_to_mesh_3d('A', Quality::High, 5.0)?;
 
 ## Performance
 
+fontmesh is **2-3x faster** than comparable libraries, with robust triangulation via Lyon.
+
 <p align="center">
-  <img src="images/benchmark.png" width="80%" alt="Benchmark Comparison" />
+  <img src="images/benchmark_comparison.png" width="85%" alt="Benchmark Comparison" />
 </p>
+
+Run benchmarks yourself: `cargo bench`
 
 ## Examples
 
