@@ -1,6 +1,6 @@
 [package]
 name = "fontmesh"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Po Hsuan Lai <pohsuanlai0208@gmail.com>"]
 license = "MIT"
@@ -17,7 +17,6 @@ lyon_tessellation = "1.0"
 serde = { version = "1.0", optional = true }
 
 [dev-dependencies]
-criterion = "0.5"
 
 [features]
 default = []

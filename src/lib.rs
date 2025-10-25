@@ -59,8 +59,11 @@ impl<'a> Font<'a> {
     /// ```
     pub fn glyph_to_mesh_2d(&self, character: char, quality: Quality) -> Result<Mesh2D> {
         let glyph = self.glyph_by_char(character)?;
-        let outline = glyph.linearize(quality)?;
-        triangulate::triangulate(&outline)
+        match glyph.linearize(quality) {
+            Ok(outline) => triangulate::triangulate(&outline),
+            Err(FontMeshError::NoOutline) => Ok(Mesh2D::new()), // Return empty mesh for space/whitespace
+            Err(e) => Err(e),
+        }
     }
 
     /// Convert a character glyph to a 3D triangle mesh with extrusion
@@ -85,15 +88,20 @@ impl<'a> Font<'a> {
         depth: f32,
     ) -> Result<Mesh3D> {
         let glyph = self.glyph_by_char(character)?;
-        let outline = glyph.linearize(quality)?;
-        let mesh_2d = triangulate::triangulate(&outline)?;
-        extrude::extrude(&mesh_2d, &outline, depth)
+        match glyph.linearize(quality) {
+            Ok(outline) => {
+                let mesh_2d = triangulate::triangulate(&outline)?;
+                extrude::extrude(&mesh_2d, &outline, depth)
+            }
+            Err(FontMeshError::NoOutline) => Ok(Mesh3D::new()), // Return empty mesh for space/whitespace
+            Err(e) => Err(e),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     // Tests will be added when we have test fonts
     #[test]

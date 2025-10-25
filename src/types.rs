@@ -1,22 +1,21 @@
-//! Core types for fontmesh
+//! Core type definitions for fontmesh
 
-use glam::{Vec2, Vec3};
+use glam::Vec2;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
-/// Quality level for mesh generation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub type Point2D = Vec2;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Quality {
-    /// Low quality (10 subdivisions)
     Low,
-    /// Normal quality (20 subdivisions)
     Normal,
-    /// High quality (50 subdivisions)
     High,
-    /// Custom quality level
     Custom(u8),
 }
 
 impl Quality {
-    /// Get the subdivision level as a scalar value
     pub fn value(&self) -> u8 {
         match self {
             Quality::Low => 10,
@@ -27,29 +26,35 @@ impl Quality {
     }
 }
 
-impl Default for Quality {
-    fn default() -> Self {
-        Quality::Normal
+/// A point in a contour with on-curve flag
+#[derive(Debug, Clone, Copy)]
+pub struct ContourPoint {
+    pub point: Point2D,
+    pub on_curve: bool,
+}
+
+impl ContourPoint {
+    pub fn new(point: Point2D, on_curve: bool) -> Self {
+        Self { point, on_curve }
+    }
+    
+    pub fn on_curve(point: Point2D) -> Self {
+        Self { point, on_curve: true }
+    }
+    
+    pub fn off_curve(point: Point2D) -> Self {
+        Self { point, on_curve: false }
     }
 }
 
-/// A 2D point
-pub type Point2D = Vec2;
-
-/// A 3D point
-pub type Point3D = Vec3;
-
-/// A contour is a closed or open path
+/// A single contour (closed or open path)
 #[derive(Debug, Clone)]
 pub struct Contour {
-    /// Points in the contour
-    pub points: Vec<Point2D>,
-    /// Whether the contour is closed
+    pub points: Vec<ContourPoint>,
     pub closed: bool,
 }
 
 impl Contour {
-    /// Create a new contour
     pub fn new(closed: bool) -> Self {
         Self {
             points: Vec::new(),
@@ -57,64 +62,60 @@ impl Contour {
         }
     }
 
-    /// Add a point to the contour
-    pub fn push(&mut self, point: Point2D) {
+    pub fn push(&mut self, point: ContourPoint) {
         self.points.push(point);
     }
-
-    /// Get the number of points
-    pub fn len(&self) -> usize {
-        self.points.len()
+    
+    pub fn push_on_curve(&mut self, point: Point2D) {
+        self.points.push(ContourPoint::on_curve(point));
+    }
+    
+    pub fn push_off_curve(&mut self, point: Point2D) {
+        self.points.push(ContourPoint::off_curve(point));
     }
 
-    /// Check if the contour is empty
     pub fn is_empty(&self) -> bool {
         self.points.is_empty()
     }
 }
 
-/// A 2D outline consisting of multiple contours
-#[derive(Debug, Clone, Default)]
+/// A collection of contours representing a glyph outline
+#[derive(Debug, Clone)]
 pub struct Outline2D {
-    /// Contours in the outline
     pub contours: Vec<Contour>,
 }
 
 impl Outline2D {
-    /// Create a new empty outline
     pub fn new() -> Self {
         Self {
             contours: Vec::new(),
         }
     }
 
-    /// Add a contour to the outline
     pub fn add_contour(&mut self, contour: Contour) {
         self.contours.push(contour);
     }
 
-    /// Check if the outline is empty
     pub fn is_empty(&self) -> bool {
         self.contours.is_empty()
     }
+}
 
-    /// Get the total number of points across all contours
-    pub fn total_points(&self) -> usize {
-        self.contours.iter().map(|c| c.len()).sum()
+impl Default for Outline2D {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 /// A 2D triangle mesh
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Mesh2D {
-    /// Vertex positions (x, y)
-    pub vertices: Vec<[f32; 2]>,
-    /// Triangle indices (3 per triangle)
+    pub vertices: Vec<Point2D>,
     pub indices: Vec<u32>,
 }
 
 impl Mesh2D {
-    /// Create a new empty 2D mesh
     pub fn new() -> Self {
         Self {
             vertices: Vec::new(),
@@ -122,47 +123,47 @@ impl Mesh2D {
         }
     }
 
-    /// Get the number of vertices
     pub fn vertex_count(&self) -> usize {
         self.vertices.len()
     }
 
-    /// Get the number of triangles
     pub fn triangle_count(&self) -> usize {
         self.indices.len() / 3
     }
 
+    /// Clear the mesh data for reuse (retains capacity)
+    ///
+    /// This allows the mesh to be reused for multiple glyphs without
+    /// reallocating memory, improving performance when processing many glyphs.
+    #[inline]
+    pub fn clear(&mut self) {
+        self.vertices.clear();
+        self.indices.clear();
+    }
+
     /// Check if the mesh is empty
+    #[inline]
     pub fn is_empty(&self) -> bool {
-        self.vertices.is_empty() || self.indices.is_empty()
+        self.vertices.is_empty()
     }
+}
 
-    /// Iterator over vertices
-    pub fn iter_vertices(&self) -> impl Iterator<Item = Vertex2D> + '_ {
-        self.vertices.iter().map(|v| Vertex2D { val: *v })
-    }
-
-    /// Iterator over faces (triangles)
-    pub fn iter_faces(&self) -> impl Iterator<Item = Face> + '_ {
-        self.indices.chunks_exact(3).map(|chunk| Face {
-            indices: (chunk[0], chunk[1], chunk[2]),
-        })
+impl Default for Mesh2D {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 /// A 3D triangle mesh with normals
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Mesh3D {
-    /// Vertex positions (x, y, z)
-    pub vertices: Vec<[f32; 3]>,
-    /// Vertex normals (normalized)
-    pub normals: Vec<[f32; 3]>,
-    /// Triangle indices (3 per triangle)
+    pub vertices: Vec<glam::Vec3>,
+    pub normals: Vec<glam::Vec3>,
     pub indices: Vec<u32>,
 }
 
 impl Mesh3D {
-    /// Create a new empty 3D mesh
     pub fn new() -> Self {
         Self {
             vertices: Vec::new(),
@@ -171,96 +172,162 @@ impl Mesh3D {
         }
     }
 
-    /// Get the number of vertices
     pub fn vertex_count(&self) -> usize {
         self.vertices.len()
     }
 
-    /// Get the number of triangles
     pub fn triangle_count(&self) -> usize {
         self.indices.len() / 3
     }
 
+    /// Clear the mesh data for reuse (retains capacity)
+    ///
+    /// This allows the mesh to be reused for multiple glyphs without
+    /// reallocating memory, improving performance when processing many glyphs.
+    #[inline]
+    pub fn clear(&mut self) {
+        self.vertices.clear();
+        self.normals.clear();
+        self.indices.clear();
+    }
+
     /// Check if the mesh is empty
+    #[inline]
     pub fn is_empty(&self) -> bool {
-        self.vertices.is_empty() || self.indices.is_empty()
+        self.vertices.is_empty()
     }
 
-    /// Get the total number of vertices (for compatibility with ttf2mesh API)
-    pub fn vertices_len(&self) -> usize {
-        self.vertices.len()
-    }
-
-    /// Iterator over vertices
-    pub fn iter_vertices(&self) -> impl Iterator<Item = Vertex3D> + '_ {
-        self.vertices.iter().map(|v| Vertex3D { val: *v })
-    }
-
-    /// Iterator over normals (returns Some if normals exist)
-    pub fn iter_normals(&self) -> Option<impl Iterator<Item = Normal> + '_> {
-        if self.normals.is_empty() {
-            None
-        } else {
-            Some(self.normals.iter().map(|n| Normal { val: *n }))
+    /// Iterate over vertices
+    pub fn iter_vertices(&self) -> VertexIterator<'_> {
+        VertexIterator {
+            vertices: &self.vertices,
+            index: 0,
         }
     }
 
-    /// Iterator over faces (triangles)
-    pub fn iter_faces(&self) -> impl Iterator<Item = Face> + '_ {
-        self.indices.chunks_exact(3).map(|chunk| Face {
-            indices: (chunk[0], chunk[1], chunk[2]),
-        })
+    /// Iterate over normals
+    pub fn iter_normals(&self) -> Option<NormalIterator<'_>> {
+        if self.normals.is_empty() {
+            None
+        } else {
+            Some(NormalIterator {
+                normals: &self.normals,
+                index: 0,
+            })
+        }
+    }
+
+    /// Iterate over faces (triangles)
+    pub fn iter_faces(&self) -> FaceIterator<'_> {
+        FaceIterator {
+            indices: &self.indices,
+            index: 0,
+        }
     }
 }
 
-/// 2D vertex wrapper (compatible with ttf2mesh API)
-#[derive(Debug, Clone, Copy)]
-pub struct Vertex2D {
-    pub val: [f32; 2],
-}
-
-impl Vertex2D {
-    /// Get the vertex values as a tuple (x, y)
-    pub fn val(&self) -> (f32, f32) {
-        (self.val[0], self.val[1])
+impl Default for Mesh3D {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-/// 3D vertex wrapper (compatible with ttf2mesh API)
-#[derive(Debug, Clone, Copy)]
-pub struct Vertex3D {
-    pub val: [f32; 3],
+/// Iterator over mesh vertices
+pub struct VertexIterator<'a> {
+    vertices: &'a [glam::Vec3],
+    index: usize,
 }
 
-impl Vertex3D {
-    /// Get the vertex values as a tuple (x, y, z)
+impl<'a> Iterator for VertexIterator<'a> {
+    type Item = Vertex<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.vertices.len() {
+            let vertex = &self.vertices[self.index];
+            self.index += 1;
+            Some(Vertex { vertex })
+        } else {
+            None
+        }
+    }
+}
+
+/// Vertex accessor
+pub struct Vertex<'a> {
+    vertex: &'a glam::Vec3,
+}
+
+impl<'a> Vertex<'a> {
+    /// Get vertex coordinates as (x, y, z)
     pub fn val(&self) -> (f32, f32, f32) {
-        (self.val[0], self.val[1], self.val[2])
+        (self.vertex.x, self.vertex.y, self.vertex.z)
     }
 }
 
-/// Normal vector wrapper (compatible with ttf2mesh API)
-#[derive(Debug, Clone, Copy)]
-pub struct Normal {
-    pub val: [f32; 3],
+/// Iterator over mesh normals
+pub struct NormalIterator<'a> {
+    normals: &'a [glam::Vec3],
+    index: usize,
 }
 
-impl Normal {
-    /// Get the normal values as a tuple (x, y, z)
+impl<'a> Iterator for NormalIterator<'a> {
+    type Item = Normal<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.normals.len() {
+            let normal = &self.normals[self.index];
+            self.index += 1;
+            Some(Normal { normal })
+        } else {
+            None
+        }
+    }
+}
+
+/// Normal accessor
+pub struct Normal<'a> {
+    normal: &'a glam::Vec3,
+}
+
+impl<'a> Normal<'a> {
+    /// Get normal coordinates as (nx, ny, nz)
     pub fn val(&self) -> (f32, f32, f32) {
-        (self.val[0], self.val[1], self.val[2])
+        (self.normal.x, self.normal.y, self.normal.z)
     }
 }
 
-/// Face (triangle) wrapper (compatible with ttf2mesh API)
-#[derive(Debug, Clone, Copy)]
+/// Iterator over mesh faces
+pub struct FaceIterator<'a> {
+    indices: &'a [u32],
+    index: usize,
+}
+
+impl<'a> Iterator for FaceIterator<'a> {
+    type Item = Face;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index + 2 < self.indices.len() {
+            let i0 = self.indices[self.index];
+            let i1 = self.indices[self.index + 1];
+            let i2 = self.indices[self.index + 2];
+            self.index += 3;
+            Some(Face { i0, i1, i2 })
+        } else {
+            None
+        }
+    }
+}
+
+/// Face (triangle) accessor
 pub struct Face {
-    pub indices: (u32, u32, u32),
+    i0: u32,
+    i1: u32,
+    i2: u32,
 }
 
 impl Face {
-    /// Get the face indices as a tuple (i0, i1, i2)
+    /// Get face indices as (i0, i1, i2)
     pub fn val(&self) -> (u32, u32, u32) {
-        self.indices
+        (self.i0, self.i1, self.i2)
     }
 }

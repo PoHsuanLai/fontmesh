@@ -2,6 +2,7 @@
 
 use crate::error::{FontMeshError, Result};
 use crate::glyph::Glyph;
+use crate::types::{Mesh2D, Mesh3D, Quality};
 use ttf_parser::{Face, GlyphId};
 
 /// A loaded TrueType font
@@ -92,11 +93,81 @@ impl<'a> Font<'a> {
     pub fn line_gap(&self) -> f32 {
         self.face.line_gap() as f32 / self.face.units_per_em() as f32
     }
+
+    /// Convert a character to a 2D mesh, reusing an existing buffer
+    ///
+    /// This is more efficient than `glyph_to_mesh_2d()` when converting many glyphs,
+    /// as it reuses allocated memory instead of allocating new vectors each time.
+    ///
+    /// # Arguments
+    /// * `c` - The character to convert
+    /// * `quality` - Quality level for curve subdivision
+    /// * `mesh` - Existing mesh to write into (will be cleared first)
+    ///
+    /// # Example
+    /// ```ignore
+    /// let mut mesh = Mesh2D::new();
+    /// for c in "Hello".chars() {
+    ///     font.glyph_to_mesh_2d_reuse(c, Quality::Normal, &mut mesh)?;
+    ///     // Use mesh...
+    /// }
+    /// ```
+    #[inline]
+    pub fn glyph_to_mesh_2d_reuse(&self, c: char, quality: Quality, mesh: &mut Mesh2D) -> Result<()> {
+        mesh.clear();
+        let glyph = self.glyph_by_char(c)?;
+        match glyph.outline() {
+            Ok(outline) => {
+                let linearized = crate::linearize::linearize_outline(outline, quality)?;
+                let new_mesh = crate::triangulate::triangulate(&linearized)?;
+                *mesh = new_mesh;
+                Ok(())
+            }
+            Err(FontMeshError::NoOutline) => Ok(()), // Leave mesh empty for space/whitespace
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Convert a character to a 3D mesh, reusing an existing buffer
+    ///
+    /// This is more efficient than `glyph_to_mesh_3d()` when converting many glyphs,
+    /// as it reuses allocated memory instead of allocating new vectors each time.
+    ///
+    /// # Arguments
+    /// * `c` - The character to convert
+    /// * `quality` - Quality level for curve subdivision
+    /// * `depth` - Extrusion depth
+    /// * `mesh` - Existing mesh to write into (will be cleared first)
+    ///
+    /// # Example
+    /// ```ignore
+    /// let mut mesh = Mesh3D::new();
+    /// for c in "Hello".chars() {
+    ///     font.glyph_to_mesh_3d_reuse(c, Quality::Normal, 1.0, &mut mesh)?;
+    ///     // Use mesh...
+    /// }
+    /// ```
+    #[inline]
+    pub fn glyph_to_mesh_3d_reuse(&self, c: char, quality: Quality, depth: f32, mesh: &mut Mesh3D) -> Result<()> {
+        mesh.clear();
+        let glyph = self.glyph_by_char(c)?;
+        match glyph.outline() {
+            Ok(outline) => {
+                let linearized = crate::linearize::linearize_outline(outline, quality)?;
+                let mesh_2d = crate::triangulate::triangulate(&linearized)?;
+                let new_mesh = crate::extrude::extrude(&mesh_2d, &linearized, depth)?;
+                *mesh = new_mesh;
+                Ok(())
+            }
+            Err(FontMeshError::NoOutline) => Ok(()), // Leave mesh empty for space/whitespace
+            Err(e) => Err(e),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     #[test]
     fn test_font_loading() {

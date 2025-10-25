@@ -1,7 +1,7 @@
 //! Glyph representation and outline extraction
 
 use crate::error::{FontMeshError, Result};
-use crate::types::{Contour, Outline2D, Point2D, Quality};
+use crate::types::{Contour, ContourPoint, Outline2D, Point2D, Quality};
 use glam::Vec2;
 use ttf_parser::{Face, GlyphId, OutlineBuilder};
 
@@ -24,6 +24,7 @@ impl<'a> Glyph<'a> {
     ///
     /// # Returns
     /// The 2D outline of the glyph, or an error if extraction fails
+    #[inline]
     pub fn outline(&self) -> Result<Outline2D> {
         let mut builder = OutlineExtractor::new(self.face.units_per_em());
 
@@ -45,6 +46,7 @@ impl<'a> Glyph<'a> {
     ///
     /// # Returns
     /// A linearized outline ready for triangulation
+    #[inline]
     pub fn linearize(&self, quality: Quality) -> Result<Outline2D> {
         let outline = self.outline()?;
         crate::linearize::linearize_outline(outline, quality)
@@ -56,66 +58,80 @@ struct OutlineExtractor {
     outline: Outline2D,
     current_contour: Option<Contour>,
     scale: f32,
+    last_point: Option<Point2D>,
 }
 
 impl OutlineExtractor {
+    #[inline]
     fn new(units_per_em: u16) -> Self {
         Self {
             outline: Outline2D::new(),
             current_contour: None,
             scale: 1.0 / units_per_em as f32,
+            last_point: None,
         }
     }
 
+    #[inline(always)]
     fn point(&self, x: f32, y: f32) -> Point2D {
         Vec2::new(x * self.scale, y * self.scale)
     }
 
-    fn push_point(&mut self, point: Point2D) {
+    #[inline(always)]
+    fn push_point(&mut self, point: ContourPoint) {
         if let Some(ref mut contour) = self.current_contour {
             contour.push(point);
+            self.last_point = Some(point.point);
         }
     }
 
+    #[inline]
     fn finish_contour(&mut self) {
         if let Some(contour) = self.current_contour.take() {
             if !contour.is_empty() {
                 self.outline.add_contour(contour);
             }
         }
+        self.last_point = None;
     }
 }
 
 impl OutlineBuilder for OutlineExtractor {
+    #[inline]
     fn move_to(&mut self, x: f32, y: f32) {
         // Finish previous contour if any
         self.finish_contour();
 
         // Start new contour
         let mut contour = Contour::new(true);
-        contour.push(self.point(x, y));
+        let pt = self.point(x, y);
+        contour.push(ContourPoint::on_curve(pt));
+        self.last_point = Some(pt);
         self.current_contour = Some(contour);
     }
 
+    #[inline]
     fn line_to(&mut self, x: f32, y: f32) {
-        self.push_point(self.point(x, y));
+        let pt = self.point(x, y);
+        self.push_point(ContourPoint::on_curve(pt));
     }
 
+    #[inline]
     fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
-        // Quadratic Bezier curve - we'll store the control point for now
-        // Linearization will happen later
-        self.push_point(self.point(x1, y1));
-        self.push_point(self.point(x, y));
+        // Quadratic Bezier: control point (off-curve) + end point (on-curve)
+        self.push_point(ContourPoint::off_curve(self.point(x1, y1)));
+        self.push_point(ContourPoint::on_curve(self.point(x, y)));
     }
 
+    #[inline]
     fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-        // Cubic Bezier curve - store control points
-        // Linearization will happen later
-        self.push_point(self.point(x1, y1));
-        self.push_point(self.point(x2, y2));
-        self.push_point(self.point(x, y));
+        // Cubic Bezier: two control points (off-curve) + end point (on-curve)
+        self.push_point(ContourPoint::off_curve(self.point(x1, y1)));
+        self.push_point(ContourPoint::off_curve(self.point(x2, y2)));
+        self.push_point(ContourPoint::on_curve(self.point(x, y)));
     }
 
+    #[inline]
     fn close(&mut self) {
         self.finish_contour();
     }
@@ -123,7 +139,7 @@ impl OutlineBuilder for OutlineExtractor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     #[test]
     fn test_outline_extraction() {

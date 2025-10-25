@@ -1,6 +1,7 @@
 //! 2D triangulation using lyon_tessellation
 
 use crate::error::{FontMeshError, Result};
+use glam::Vec2;
 use crate::types::{Mesh2D, Outline2D};
 use lyon_tessellation::{
     FillOptions, FillTessellator, FillVertex, GeometryBuilder, VertexBuffers, VertexId,
@@ -16,6 +17,7 @@ use lyon_tessellation::{
 ///
 /// # Returns
 /// A 2D triangle mesh
+#[inline]
 pub fn triangulate(outline: &Outline2D) -> Result<Mesh2D> {
     if outline.is_empty() {
         return Err(FontMeshError::TriangulationFailed(
@@ -38,12 +40,12 @@ pub fn triangulate(outline: &Outline2D) -> Result<Mesh2D> {
         }
 
         // Start the contour
-        let first = contour.points[0];
+        let first = contour.points[0].point;
         builder.begin(lyon_tessellation::math::Point::new(first.x, first.y));
 
         // Add lines to the rest of the points
-        for point in &contour.points[1..] {
-            builder.line_to(lyon_tessellation::math::Point::new(point.x, point.y));
+        for cp in &contour.points[1..] {
+            builder.line_to(lyon_tessellation::math::Point::new(cp.point.x, cp.point.y));
         }
 
         // Close the contour if needed
@@ -67,9 +69,10 @@ pub fn triangulate(outline: &Outline2D) -> Result<Mesh2D> {
             FontMeshError::TriangulationFailed(format!("Lyon tessellation failed: {:?}", e))
         })?;
 
-    // Convert to our Mesh2D format
+    // Convert to our Mesh2D format (pre-allocate for efficiency)
+    let vertices: Vec<Vec2> = geometry.vertices.into_iter().map(Vec2::from).collect();
     Ok(Mesh2D {
-        vertices: geometry.vertices,
+        vertices,
         indices: geometry.indices,
     })
 }
@@ -78,6 +81,7 @@ pub fn triangulate(outline: &Outline2D) -> Result<Mesh2D> {
 struct SimpleBuffersBuilder<'a>(&'a mut VertexBuffers<[f32; 2], u32>);
 
 impl<'a> GeometryBuilder for SimpleBuffersBuilder<'a> {
+    #[inline]
     fn add_triangle(&mut self, a: VertexId, b: VertexId, c: VertexId) {
         self.0.indices.push(a.0);
         self.0.indices.push(b.0);
@@ -96,7 +100,7 @@ impl<'a> lyon_tessellation::FillGeometryBuilder for SimpleBuffersBuilder<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{Contour, Point2D};
+    use crate::types::Contour;
     use glam::Vec2;
 
     #[test]
@@ -105,10 +109,10 @@ mod tests {
         let mut outline = Outline2D::new();
         let mut contour = Contour::new(true);
 
-        contour.push(Vec2::new(0.0, 0.0));
-        contour.push(Vec2::new(1.0, 0.0));
-        contour.push(Vec2::new(1.0, 1.0));
-        contour.push(Vec2::new(0.0, 1.0));
+        contour.push_on_curve(Vec2::new(0.0, 0.0));
+        contour.push_on_curve(Vec2::new(1.0, 0.0));
+        contour.push_on_curve(Vec2::new(1.0, 1.0));
+        contour.push_on_curve(Vec2::new(0.0, 1.0));
 
         outline.add_contour(contour);
 

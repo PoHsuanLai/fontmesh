@@ -18,11 +18,11 @@ fn test_2d_mesh_structure() {
 
     // Test multiple characters
     for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".chars() {
-        let mesh = font.glyph_to_mesh_2d(c, Quality::Normal).expect(&format!("Failed to generate mesh for '{}'", c));
+        let mesh = font.glyph_to_mesh_2d(c, Quality::Normal).unwrap_or_else(|_| panic!("Failed to generate mesh for '{}'", c));
 
         // Basic structure validation
         assert!(mesh.vertex_count() > 0, "Mesh for '{}' should have vertices", c);
-        assert!(mesh.indices.len() % 3 == 0, "Indices for '{}' should be multiple of 3", c);
+        assert!(mesh.indices.len().is_multiple_of(3), "Indices for '{}' should be multiple of 3", c);
 
         // All indices should be within vertex range
         for &idx in &mesh.indices {
@@ -47,13 +47,13 @@ fn test_3d_mesh_structure() {
     for c in "ABCXYZ123".chars() {
         for depth in [1.0, 5.0, 10.0] {
             let mesh = font.glyph_to_mesh_3d(c, Quality::Normal, depth)
-                .expect(&format!("Failed to generate 3D mesh for '{}'", c));
+                .unwrap_or_else(|_| panic!("Failed to generate 3D mesh for '{}'", c));
 
             // Basic structure validation
             assert!(mesh.vertex_count() > 0, "3D Mesh for '{}' should have vertices", c);
             assert_eq!(mesh.vertices.len(), mesh.normals.len(),
                 "Vertices and normals count should match for '{}'", c);
-            assert!(mesh.indices.len() % 3 == 0, "Indices for '{}' should be multiple of 3", c);
+            assert!(mesh.indices.len().is_multiple_of(3), "Indices for '{}' should be multiple of 3", c);
 
             // All indices should be within vertex range
             for &idx in &mesh.indices {
