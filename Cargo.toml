@@ -9,6 +9,11 @@ repository = "https://github.com/PoHsuanLai/fontmesh"
 readme = "README.md"
 keywords = ["font", "mesh", "ttf", "truetype", "triangulation"]
 categories = ["graphics", "game-development", "rendering"]
+documentation = "https://docs.rs/fontmesh"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 ttf-parser = "0.24"
