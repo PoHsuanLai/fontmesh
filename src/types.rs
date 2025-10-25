@@ -37,13 +37,19 @@ impl ContourPoint {
     pub fn new(point: Point2D, on_curve: bool) -> Self {
         Self { point, on_curve }
     }
-    
+
     pub fn on_curve(point: Point2D) -> Self {
-        Self { point, on_curve: true }
+        Self {
+            point,
+            on_curve: true,
+        }
     }
-    
+
     pub fn off_curve(point: Point2D) -> Self {
-        Self { point, on_curve: false }
+        Self {
+            point,
+            on_curve: false,
+        }
     }
 }
 
@@ -65,11 +71,11 @@ impl Contour {
     pub fn push(&mut self, point: ContourPoint) {
         self.points.push(point);
     }
-    
+
     pub fn push_on_curve(&mut self, point: Point2D) {
         self.points.push(ContourPoint::on_curve(point));
     }
-    
+
     pub fn push_off_curve(&mut self, point: Point2D) {
         self.points.push(ContourPoint::off_curve(point));
     }

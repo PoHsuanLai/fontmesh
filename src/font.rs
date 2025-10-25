@@ -25,9 +25,8 @@ impl<'a> Font<'a> {
     /// let font = Font::from_bytes(font_data)?;
     /// ```
     pub fn from_bytes(data: &'a [u8]) -> Result<Self> {
-        let face = Face::parse(data, 0).map_err(|e| {
-            FontMeshError::ParseError(format!("Failed to parse font: {:?}", e))
-        })?;
+        let face = Face::parse(data, 0)
+            .map_err(|e| FontMeshError::ParseError(format!("Failed to parse font: {:?}", e)))?;
 
         Ok(Self { face, _data: data })
     }
@@ -113,7 +112,12 @@ impl<'a> Font<'a> {
     /// }
     /// ```
     #[inline]
-    pub fn glyph_to_mesh_2d_reuse(&self, c: char, quality: Quality, mesh: &mut Mesh2D) -> Result<()> {
+    pub fn glyph_to_mesh_2d_reuse(
+        &self,
+        c: char,
+        quality: Quality,
+        mesh: &mut Mesh2D,
+    ) -> Result<()> {
         mesh.clear();
         let glyph = self.glyph_by_char(c)?;
         match glyph.outline() {
@@ -148,7 +152,13 @@ impl<'a> Font<'a> {
     /// }
     /// ```
     #[inline]
-    pub fn glyph_to_mesh_3d_reuse(&self, c: char, quality: Quality, depth: f32, mesh: &mut Mesh3D) -> Result<()> {
+    pub fn glyph_to_mesh_3d_reuse(
+        &self,
+        c: char,
+        quality: Quality,
+        depth: f32,
+        mesh: &mut Mesh3D,
+    ) -> Result<()> {
         mesh.clear();
         let glyph = self.glyph_by_char(c)?;
         match glyph.outline() {
@@ -167,7 +177,6 @@ impl<'a> Font<'a> {
 
 #[cfg(test)]
 mod tests {
-    
 
     #[test]
     fn test_font_loading() {

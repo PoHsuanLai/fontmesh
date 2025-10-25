@@ -18,23 +18,45 @@ fn test_2d_mesh_structure() {
 
     // Test multiple characters
     for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".chars() {
-        let mesh = font.glyph_to_mesh_2d(c, Quality::Normal).unwrap_or_else(|_| panic!("Failed to generate mesh for '{}'", c));
+        let mesh = font
+            .glyph_to_mesh_2d(c, Quality::Normal)
+            .unwrap_or_else(|_| panic!("Failed to generate mesh for '{}'", c));
 
         // Basic structure validation
-        assert!(mesh.vertex_count() > 0, "Mesh for '{}' should have vertices", c);
-        assert!(mesh.indices.len().is_multiple_of(3), "Indices for '{}' should be multiple of 3", c);
+        assert!(
+            mesh.vertex_count() > 0,
+            "Mesh for '{}' should have vertices",
+            c
+        );
+        assert!(
+            mesh.indices.len().is_multiple_of(3),
+            "Indices for '{}' should be multiple of 3",
+            c
+        );
 
         // All indices should be within vertex range
         for &idx in &mesh.indices {
-            assert!((idx as usize) < mesh.vertex_count(),
+            assert!(
+                (idx as usize) < mesh.vertex_count(),
                 "Index {} out of bounds for character '{}' with {} vertices",
-                idx, c, mesh.vertex_count());
+                idx,
+                c,
+                mesh.vertex_count()
+            );
         }
 
         // Vertices should be in reasonable range (normalized coordinates)
         for vertex in &mesh.vertices {
-            assert!(vertex[0].is_finite(), "Vertex x should be finite for '{}'", c);
-            assert!(vertex[1].is_finite(), "Vertex y should be finite for '{}'", c);
+            assert!(
+                vertex[0].is_finite(),
+                "Vertex x should be finite for '{}'",
+                c
+            );
+            assert!(
+                vertex[1].is_finite(),
+                "Vertex y should be finite for '{}'",
+                c
+            );
         }
     }
 }
@@ -46,41 +68,80 @@ fn test_3d_mesh_structure() {
     // Test multiple characters with different depths
     for c in "ABCXYZ123".chars() {
         for depth in [1.0, 5.0, 10.0] {
-            let mesh = font.glyph_to_mesh_3d(c, Quality::Normal, depth)
+            let mesh = font
+                .glyph_to_mesh_3d(c, Quality::Normal, depth)
                 .unwrap_or_else(|_| panic!("Failed to generate 3D mesh for '{}'", c));
 
             // Basic structure validation
-            assert!(mesh.vertex_count() > 0, "3D Mesh for '{}' should have vertices", c);
-            assert_eq!(mesh.vertices.len(), mesh.normals.len(),
-                "Vertices and normals count should match for '{}'", c);
-            assert!(mesh.indices.len().is_multiple_of(3), "Indices for '{}' should be multiple of 3", c);
+            assert!(
+                mesh.vertex_count() > 0,
+                "3D Mesh for '{}' should have vertices",
+                c
+            );
+            assert_eq!(
+                mesh.vertices.len(),
+                mesh.normals.len(),
+                "Vertices and normals count should match for '{}'",
+                c
+            );
+            assert!(
+                mesh.indices.len().is_multiple_of(3),
+                "Indices for '{}' should be multiple of 3",
+                c
+            );
 
             // All indices should be within vertex range
             for &idx in &mesh.indices {
-                assert!((idx as usize) < mesh.vertex_count(),
+                assert!(
+                    (idx as usize) < mesh.vertex_count(),
                     "Index {} out of bounds for character '{}' with {} vertices",
-                    idx, c, mesh.vertex_count());
+                    idx,
+                    c,
+                    mesh.vertex_count()
+                );
             }
 
             // Normals should be normalized (length ~= 1.0)
             for normal in &mesh.normals {
-                let length_sq = normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2];
+                let length_sq =
+                    normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2];
                 let length = length_sq.sqrt();
-                assert!((length - 1.0).abs() < 0.01,
-                    "Normal should be normalized for '{}', got length {}", c, length);
+                assert!(
+                    (length - 1.0).abs() < 0.01,
+                    "Normal should be normalized for '{}', got length {}",
+                    c,
+                    length
+                );
             }
 
             // Vertices should be in reasonable range
             for vertex in &mesh.vertices {
-                assert!(vertex[0].is_finite(), "Vertex x should be finite for '{}'", c);
-                assert!(vertex[1].is_finite(), "Vertex y should be finite for '{}'", c);
-                assert!(vertex[2].is_finite(), "Vertex z should be finite for '{}'", c);
+                assert!(
+                    vertex[0].is_finite(),
+                    "Vertex x should be finite for '{}'",
+                    c
+                );
+                assert!(
+                    vertex[1].is_finite(),
+                    "Vertex y should be finite for '{}'",
+                    c
+                );
+                assert!(
+                    vertex[2].is_finite(),
+                    "Vertex z should be finite for '{}'",
+                    c
+                );
 
                 // Z coordinate should be within [-depth/2, depth/2]
                 let half_depth = depth / 2.0;
-                assert!(vertex[2] >= -half_depth - 0.01 && vertex[2] <= half_depth + 0.01,
+                assert!(
+                    vertex[2] >= -half_depth - 0.01 && vertex[2] <= half_depth + 0.01,
                     "Vertex z {} should be within depth range [-{}, {}] for '{}'",
-                    vertex[2], half_depth, half_depth, c);
+                    vertex[2],
+                    half_depth,
+                    half_depth,
+                    c
+                );
             }
         }
     }
@@ -96,15 +157,31 @@ fn test_quality_levels() {
 
     // Higher quality should generally produce more vertices
     // (for characters with curves like 'S')
-    assert!(low.vertex_count() <= normal.vertex_count(),
-        "Low quality should have <= vertices than normal");
-    assert!(normal.vertex_count() <= high.vertex_count(),
-        "Normal quality should have <= vertices than high");
+    assert!(
+        low.vertex_count() <= normal.vertex_count(),
+        "Low quality should have <= vertices than normal"
+    );
+    assert!(
+        normal.vertex_count() <= high.vertex_count(),
+        "Normal quality should have <= vertices than high"
+    );
 
     println!("Quality comparison for 'S':");
-    println!("  Low: {} vertices, {} triangles", low.vertex_count(), low.triangle_count());
-    println!("  Normal: {} vertices, {} triangles", normal.vertex_count(), normal.triangle_count());
-    println!("  High: {} vertices, {} triangles", high.vertex_count(), high.triangle_count());
+    println!(
+        "  Low: {} vertices, {} triangles",
+        low.vertex_count(),
+        low.triangle_count()
+    );
+    println!(
+        "  Normal: {} vertices, {} triangles",
+        normal.vertex_count(),
+        normal.triangle_count()
+    );
+    println!(
+        "  High: {} vertices, {} triangles",
+        high.vertex_count(),
+        high.triangle_count()
+    );
 }
 
 #[test]
@@ -114,36 +191,62 @@ fn test_iterator_api() {
 
     // Test vertex iterator
     let vertex_count = mesh.iter_vertices().count();
-    assert_eq!(vertex_count, mesh.vertices.len(), "Vertex iterator count should match");
+    assert_eq!(
+        vertex_count,
+        mesh.vertices.len(),
+        "Vertex iterator count should match"
+    );
 
     // Test normal iterator
     let normal_count = mesh.iter_normals().unwrap().count();
-    assert_eq!(normal_count, mesh.normals.len(), "Normal iterator count should match");
+    assert_eq!(
+        normal_count,
+        mesh.normals.len(),
+        "Normal iterator count should match"
+    );
 
     // Test face iterator
     let face_count = mesh.iter_faces().count();
-    assert_eq!(face_count, mesh.indices.len() / 3, "Face iterator count should match");
+    assert_eq!(
+        face_count,
+        mesh.indices.len() / 3,
+        "Face iterator count should match"
+    );
 
     // Test vertex accessor
     for vertex in mesh.iter_vertices().take(5) {
         let (x, y, z) = vertex.val();
-        assert!(x.is_finite() && y.is_finite() && z.is_finite(),
-            "Vertex values should be finite");
+        assert!(
+            x.is_finite() && y.is_finite() && z.is_finite(),
+            "Vertex values should be finite"
+        );
     }
 
     // Test normal accessor
     for normal in mesh.iter_normals().unwrap().take(5) {
         let (nx, ny, nz) = normal.val();
-        let length_sq = nx*nx + ny*ny + nz*nz;
-        assert!((length_sq.sqrt() - 1.0).abs() < 0.01, "Normal should be normalized");
+        let length_sq = nx * nx + ny * ny + nz * nz;
+        assert!(
+            (length_sq.sqrt() - 1.0).abs() < 0.01,
+            "Normal should be normalized"
+        );
     }
 
     // Test face accessor
     for face in mesh.iter_faces().take(5) {
         let (i0, i1, i2) = face.val();
-        assert!((i0 as usize) < mesh.vertex_count(), "Face index 0 should be in bounds");
-        assert!((i1 as usize) < mesh.vertex_count(), "Face index 1 should be in bounds");
-        assert!((i2 as usize) < mesh.vertex_count(), "Face index 2 should be in bounds");
+        assert!(
+            (i0 as usize) < mesh.vertex_count(),
+            "Face index 0 should be in bounds"
+        );
+        assert!(
+            (i1 as usize) < mesh.vertex_count(),
+            "Face index 1 should be in bounds"
+        );
+        assert!(
+            (i2 as usize) < mesh.vertex_count(),
+            "Face index 2 should be in bounds"
+        );
     }
 }
 
@@ -163,12 +266,20 @@ fn test_mesh_topology() {
     for (c, description) in test_chars {
         let mesh = font.glyph_to_mesh_2d(c, Quality::Normal).unwrap();
 
-        println!("Character '{}' ({}): {} vertices, {} triangles",
-            c, description, mesh.vertex_count(), mesh.triangle_count());
+        println!(
+            "Character '{}' ({}): {} vertices, {} triangles",
+            c,
+            description,
+            mesh.vertex_count(),
+            mesh.triangle_count()
+        );
 
         // Should have at least 1 triangle
-        assert!(mesh.triangle_count() >= 1,
-            "Character '{}' should have at least 1 triangle", c);
+        assert!(
+            mesh.triangle_count() >= 1,
+            "Character '{}' should have at least 1 triangle",
+            c
+        );
 
         // Euler characteristic for planar graph: V - E + F = 1 + H
         // where H is number of holes
@@ -192,10 +303,18 @@ fn test_special_characters() {
     for c in special {
         match font.glyph_to_mesh_2d(c, Quality::Normal) {
             Ok(mesh) => {
-                assert!(mesh.vertex_count() > 0, "Special char '{}' should have vertices", c);
-                println!("Character '{}': {} vertices, {} triangles",
-                    c, mesh.vertex_count(), mesh.triangle_count());
-            },
+                assert!(
+                    mesh.vertex_count() > 0,
+                    "Special char '{}' should have vertices",
+                    c
+                );
+                println!(
+                    "Character '{}': {} vertices, {} triangles",
+                    c,
+                    mesh.vertex_count(),
+                    mesh.triangle_count()
+                );
+            }
             Err(e) => {
                 // Some fonts might not have all special characters
                 println!("Character '{}' not available in font: {:?}", c, e);
@@ -218,13 +337,21 @@ fn test_depth_consistency() {
         // Check that all vertices respect the depth
         for vertex in &mesh.vertices {
             let half_depth = depth / 2.0;
-            assert!(vertex[2] >= -half_depth - 0.01 && vertex[2] <= half_depth + 0.01,
+            assert!(
+                vertex[2] >= -half_depth - 0.01 && vertex[2] <= half_depth + 0.01,
                 "Vertex z {} should be within depth range [-{}, {}]",
-                vertex[2], half_depth, half_depth);
+                vertex[2],
+                half_depth,
+                half_depth
+            );
         }
 
-        println!("Depth {}: {} vertices, {} triangles",
-            depth, mesh.vertex_count(), mesh.triangle_count());
+        println!(
+            "Depth {}: {} vertices, {} triangles",
+            depth,
+            mesh.vertex_count(),
+            mesh.triangle_count()
+        );
     }
 
     // Vertex count should be similar across different depths (same 2D outline)
@@ -248,13 +375,13 @@ fn test_error_handling() {
         match font.glyph_to_mesh_2d(c, Quality::Normal) {
             Ok(_) => {
                 println!("Character U+{:04X} is available", c as u32);
-            },
+            }
             Err(e) => {
                 println!("Character U+{:04X} not available: {:?}", c as u32, e);
                 // Error should be GlyphNotFound or NoOutline
                 assert!(
-                    format!("{:?}", e).contains("GlyphNotFound") ||
-                    format!("{:?}", e).contains("NoOutline"),
+                    format!("{:?}", e).contains("GlyphNotFound")
+                        || format!("{:?}", e).contains("NoOutline"),
                     "Error should be GlyphNotFound or NoOutline"
                 );
             }

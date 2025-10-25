@@ -1,8 +1,8 @@
 //! 2D triangulation using lyon_tessellation
 
 use crate::error::{FontMeshError, Result};
-use glam::Vec2;
 use crate::types::{Mesh2D, Outline2D};
+use glam::Vec2;
 use lyon_tessellation::{
     FillOptions, FillTessellator, FillVertex, GeometryBuilder, VertexBuffers, VertexId,
 };
@@ -60,11 +60,7 @@ pub fn triangulate(outline: &Outline2D) -> Result<Mesh2D> {
 
     // Tessellate the path
     tessellator
-        .tessellate_path(
-            &path,
-            &options,
-            &mut SimpleBuffersBuilder(&mut geometry),
-        )
+        .tessellate_path(&path, &options, &mut SimpleBuffersBuilder(&mut geometry))
         .map_err(|e| {
             FontMeshError::TriangulationFailed(format!("Lyon tessellation failed: {:?}", e))
         })?;
@@ -90,9 +86,14 @@ impl<'a> GeometryBuilder for SimpleBuffersBuilder<'a> {
 }
 
 impl<'a> lyon_tessellation::FillGeometryBuilder for SimpleBuffersBuilder<'a> {
-    fn add_fill_vertex(&mut self, vertex: FillVertex) -> std::result::Result<VertexId, lyon_tessellation::GeometryBuilderError> {
+    fn add_fill_vertex(
+        &mut self,
+        vertex: FillVertex,
+    ) -> std::result::Result<VertexId, lyon_tessellation::GeometryBuilderError> {
         let index = self.0.vertices.len() as u32;
-        self.0.vertices.push([vertex.position().x, vertex.position().y]);
+        self.0
+            .vertices
+            .push([vertex.position().x, vertex.position().y]);
         Ok(VertexId(index))
     }
 }

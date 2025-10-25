@@ -101,7 +101,6 @@ impl<'a> Font<'a> {
 
 #[cfg(test)]
 mod tests {
-    
 
     // Tests will be added when we have test fonts
     #[test]

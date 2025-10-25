@@ -1,5 +1,5 @@
 //! Curve linearization - converts Bezier curves to line segments
-//! 
+//!
 //! This implementation uses adaptive subdivision based on curve angle,
 //! matching the approach used by ttf2mesh for optimal performance.
 

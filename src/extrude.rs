@@ -25,8 +25,16 @@ pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh
     let half_depth = depth / 2.0;
 
     // Pre-calculate total size to avoid reallocations
-    let outline_edge_count: usize = outline.contours.iter()
-        .map(|c| if c.closed { c.points.len() } else { c.points.len().saturating_sub(1) })
+    let outline_edge_count: usize = outline
+        .contours
+        .iter()
+        .map(|c| {
+            if c.closed {
+                c.points.len()
+            } else {
+                c.points.len().saturating_sub(1)
+            }
+        })
         .sum();
 
     let total_vertices = mesh_2d.vertices.len() * 2 + outline_edge_count * 4;
@@ -41,7 +49,9 @@ pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh
     // 1. Create front face (z = half_depth)
     let normal_front = Vec3::new(0.0, 0.0, 1.0);
     for vertex in &mesh_2d.vertices {
-        mesh_3d.vertices.push(Vec3::new(vertex.x, vertex.y, half_depth));
+        mesh_3d
+            .vertices
+            .push(Vec3::new(vertex.x, vertex.y, half_depth));
         mesh_3d.normals.push(normal_front);
     }
 
@@ -52,7 +62,9 @@ pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh
     let back_offset = mesh_3d.vertices.len() as u32;
     let normal_back = Vec3::new(0.0, 0.0, -1.0);
     for vertex in &mesh_2d.vertices {
-        mesh_3d.vertices.push(Vec3::new(vertex.x, vertex.y, -half_depth));
+        mesh_3d
+            .vertices
+            .push(Vec3::new(vertex.x, vertex.y, -half_depth));
         mesh_3d.normals.push(normal_back);
     }
 
@@ -106,7 +118,11 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
 
             // Calculate smooth normals by averaging with adjacent edges
             let prev_idx = if i == 0 {
-                if contour.closed { num_points - 1 } else { i }
+                if contour.closed {
+                    num_points - 1
+                } else {
+                    i
+                }
             } else {
                 i - 1
             };
@@ -261,7 +277,12 @@ mod tests {
     fn test_extrude_square() {
         // Create a simple square mesh
         let mesh_2d = Mesh2D {
-            vertices: vec![Vec2::new(0.0, 0.0), Vec2::new(1.0, 0.0), Vec2::new(1.0, 1.0), Vec2::new(0.0, 1.0)],
+            vertices: vec![
+                Vec2::new(0.0, 0.0),
+                Vec2::new(1.0, 0.0),
+                Vec2::new(1.0, 1.0),
+                Vec2::new(0.0, 1.0),
+            ],
             indices: vec![0, 1, 2, 0, 2, 3],
         };
 

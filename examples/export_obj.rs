@@ -43,14 +43,7 @@ fn export_2d_glyph(font: &Font, c: char, filename: &str) {
 
     // Write faces (OBJ indices are 1-based)
     for chunk in mesh.indices.chunks(3) {
-        writeln!(
-            file,
-            "f {} {} {}",
-            chunk[0] + 1,
-            chunk[1] + 1,
-            chunk[2] + 1
-        )
-        .unwrap();
+        writeln!(file, "f {} {} {}", chunk[0] + 1, chunk[1] + 1, chunk[2] + 1).unwrap();
     }
 
     println!("  Exported 2D glyph '{}' -> {}", c, filename);

@@ -139,7 +139,6 @@ impl OutlineBuilder for OutlineExtractor {
 
 #[cfg(test)]
 mod tests {
-    
 
     #[test]
     fn test_outline_extraction() {

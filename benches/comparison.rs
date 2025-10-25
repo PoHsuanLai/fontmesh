@@ -9,7 +9,10 @@ fn benchmark_fontmesh_simple_2d(c: &mut Criterion) {
     let font = fontmesh::Font::from_bytes(font_data).unwrap();
 
     c.bench_function("fontmesh: average 2d (e)", |b| {
-        b.iter(|| font.glyph_to_mesh_2d(black_box('e'), fontmesh::Quality::Normal).unwrap())
+        b.iter(|| {
+            font.glyph_to_mesh_2d(black_box('e'), fontmesh::Quality::Normal)
+                .unwrap()
+        })
     });
 }
 
@@ -18,7 +21,10 @@ fn benchmark_fontmesh_complex_2d(c: &mut Criterion) {
     let font = fontmesh::Font::from_bytes(font_data).unwrap();
 
     c.bench_function("fontmesh: complex 2d (@)", |b| {
-        b.iter(|| font.glyph_to_mesh_2d(black_box('@'), fontmesh::Quality::Normal).unwrap())
+        b.iter(|| {
+            font.glyph_to_mesh_2d(black_box('@'), fontmesh::Quality::Normal)
+                .unwrap()
+        })
     });
 }
 
@@ -27,7 +33,10 @@ fn benchmark_fontmesh_simple_3d(c: &mut Criterion) {
     let font = fontmesh::Font::from_bytes(font_data).unwrap();
 
     c.bench_function("fontmesh: average 3d (e)", |b| {
-        b.iter(|| font.glyph_to_mesh_3d(black_box('e'), fontmesh::Quality::Normal, 0.1).unwrap())
+        b.iter(|| {
+            font.glyph_to_mesh_3d(black_box('e'), fontmesh::Quality::Normal, 0.1)
+                .unwrap()
+        })
     });
 }
 
@@ -36,7 +45,10 @@ fn benchmark_fontmesh_complex_3d(c: &mut Criterion) {
     let font = fontmesh::Font::from_bytes(font_data).unwrap();
 
     c.bench_function("fontmesh: complex 3d (@)", |b| {
-        b.iter(|| font.glyph_to_mesh_3d(black_box('@'), fontmesh::Quality::Normal, 0.1).unwrap())
+        b.iter(|| {
+            font.glyph_to_mesh_3d(black_box('@'), fontmesh::Quality::Normal, 0.1)
+                .unwrap()
+        })
     });
 }
 
