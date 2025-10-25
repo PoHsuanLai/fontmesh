@@ -1,5 +1,10 @@
 # fontmesh
 
+[![CI](https://github.com/PoHsuanLai/fontmesh/workflows/CI/badge.svg)](https://github.com/PoHsuanLai/fontmesh/actions)
+[![Crates.io](https://img.shields.io/crates/v/fontmesh.svg)](https://crates.io/crates/fontmesh)
+[![docs.rs](https://docs.rs/fontmesh/badge.svg)](https://docs.rs/fontmesh)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A fast Rust library for converting TrueType font glyphs to 2D and 3D triangle meshes.
 
 <p align="center">
@@ -31,7 +36,7 @@ let mesh_3d = font.glyph_to_mesh_3d('A', Quality::High, 5.0)?;
 fontmesh is **2-3x faster** than comparable libraries, with robust triangulation via Lyon.
 
 <p align="center">
-  <img src="images/benchmark_comparison.png" width="85%" alt="Benchmark Comparison" />
+  <img src="images/benchmark.png" width="85%" alt="Benchmark Comparison" />
 </p>
 
 Run benchmarks yourself: `cargo bench`
