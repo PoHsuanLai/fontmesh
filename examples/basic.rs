@@ -32,10 +32,8 @@ fn main() {
     // Test multiple characters
     println!("\n=== Testing Multiple Characters ===");
     for c in "Hello".chars() {
-        let mesh = font.glyph_to_mesh_2d(c, Quality::Low).expect(&format!(
-            "Failed to generate mesh for '{}'",
-            c
-        ));
+        let mesh = font.glyph_to_mesh_2d(c, Quality::Low).unwrap_or_else(|_| panic!("Failed to generate mesh for '{}'",
+        c));
         println!(
             "  '{}': {} vertices, {} triangles",
             c,
