@@ -1,8 +1,8 @@
 # fontmesh
 
-[![CI](https://github.com/PoHsuanLai/fontmesh/workflows/CI/badge.svg)](https://github.com/PoHsuanLai/fontmesh/actions)
-[![Crates.io](https://img.shields.io/crates/v/fontmesh.svg)](https://crates.io/crates/fontmesh)
-[![docs.rs](https://docs.rs/fontmesh/badge.svg)](https://docs.rs/fontmesh)
+[![CI](https://github.com/PoHsuanLai/fontmesh/actions/workflows/ci.yml/badge.svg)](https://github.com/PoHsuanLai/fontmesh/actions)
+[![Crates.io](https://img.shields.io/crates/v/fontmesh)](https://crates.io/crates/fontmesh)
+[![Documentation](https://docs.rs/fontmesh/badge.svg)](https://docs.rs/fontmesh)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A fast Rust library for converting TrueType font glyphs to 2D and 3D triangle meshes.
