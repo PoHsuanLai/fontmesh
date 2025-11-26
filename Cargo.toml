@@ -7,7 +7,7 @@ license = "MIT"
 description = "Pure Rust library for converting TrueType font glyphs to 2D/3D triangle meshes"
 repository = "https://github.com/PoHsuanLai/fontmesh"
 readme = "README.md"
-keywords = ["font", "mesh", "ttf", "truetype", "triangulation"]
+keywords = ["ttf2mesh", "ttf2mesh-rs", "font", "mesh", "ttf", "truetype", "triangulation"]
 categories = ["graphics", "game-development", "rendering"]
 documentation = "https://docs.rs/fontmesh"
 

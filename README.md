@@ -5,7 +5,7 @@
 [![Documentation](https://docs.rs/fontmesh/badge.svg)](https://docs.rs/fontmesh)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A fast Rust library for converting TrueType font glyphs to 2D and 3D triangle meshes.
+A fast Rust library for converting TrueType font glyphs to 2D and 3D triangle meshes. Providing a faster, pure rust alternative for [ttf2mesh](https://github.com/blaind/ttf2mesh-rs)
 
 <p align="center">
   <img src="images/glyph_2d.png" width="45%" alt="2D Mesh" />
