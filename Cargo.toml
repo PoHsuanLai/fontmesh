@@ -1,6 +1,6 @@
 [package]
 name = "fontmesh"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Po Hsuan Lai <pohsuanlai0208@gmail.com>"]
 license = "MIT"
