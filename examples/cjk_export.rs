@@ -17,10 +17,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // CJK and complex Latin characters
     let characters = vec![
-        ('愛', "love_chinese"),      // Chinese: love
-        ('龍', "dragon_chinese"),    // Chinese: dragon
-        ('@', "at_sign"),            // Complex Latin
-        ('&', "ampersand"),          // Complex Latin
+        ('愛', "love_chinese"),   // Chinese: love
+        ('龍', "dragon_chinese"), // Chinese: dragon
+        ('@', "at_sign"),         // Complex Latin
+        ('&', "ampersand"),       // Complex Latin
     ];
 
     for (ch, name) in characters {
@@ -85,7 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Ok(glyph) = cursive_font.glyph_by_char(ch) {
             println!("Exporting '{}' ({})...", ch, name);
 
-            let mesh = glyph.with_subdivisions(50).to_mesh_3d(5.0)?;  // Higher quality for cursive
+            let mesh = glyph.with_subdivisions(50).to_mesh_3d(5.0)?; // Higher quality for cursive
 
             let filename = format!("{}.obj", name);
             let mut file = File::create(&filename)?;

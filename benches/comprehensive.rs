@@ -108,11 +108,7 @@ fn bench_comprehensive(c: &mut Criterion) {
     // === Pipeline Stages ===
 
     group.bench_function("stage_outline", |b| {
-        b.iter(|| {
-            font.glyph_by_char(black_box('@'))
-                .unwrap()
-                .outline()
-        });
+        b.iter(|| font.glyph_by_char(black_box('@')).unwrap().outline());
     });
 
     group.bench_function("stage_linearize", |b| {

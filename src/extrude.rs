@@ -55,8 +55,12 @@ pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh
         mesh_3d.normals.push(normal_front);
     }
 
-    // Add front face triangles
-    mesh_3d.indices.extend_from_slice(&mesh_2d.indices);
+    // Add front face triangles (reversed winding to convert CW input to CCW)
+    for chunk in mesh_2d.indices.chunks_exact(3) {
+        mesh_3d.indices.push(chunk[0]);
+        mesh_3d.indices.push(chunk[2]);
+        mesh_3d.indices.push(chunk[1]);
+    }
 
     // 2. Create back face (z = -half_depth) with reversed winding
     let back_offset = mesh_3d.vertices.len() as u32;
@@ -68,11 +72,11 @@ pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh
         mesh_3d.normals.push(normal_back);
     }
 
-    // Add back face triangles (reversed winding for correct normals)
+    // Add back face triangles (keep original CW winding so it faces back)
     for chunk in mesh_2d.indices.chunks_exact(3) {
         mesh_3d.indices.push(back_offset + chunk[0]);
-        mesh_3d.indices.push(back_offset + chunk[2]); // Reversed
-        mesh_3d.indices.push(back_offset + chunk[1]); // Reversed
+        mesh_3d.indices.push(back_offset + chunk[1]);
+        mesh_3d.indices.push(back_offset + chunk[2]);
     }
 
     // 3. Create side faces
