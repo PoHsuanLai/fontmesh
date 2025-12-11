@@ -19,17 +19,41 @@ A fast Rust library for converting TrueType font glyphs to 2D and 3D triangle me
 ## Quick Start
 
 ```rust
-use fontmesh::{Font, Quality};
+use fontmesh::Font;
 
-let font_data = include_bytes!("font.ttf");
-let font = Font::from_bytes(font_data)?;
+// Load font
+let font = Font::from_bytes(include_bytes!("font.ttf"))?;
 
-// Generate a 2D mesh
-let mesh_2d = font.glyph_to_mesh_2d('A', Quality::Normal)?;
+// Generate a 2D mesh (default: 20 subdivisions per curve)
+let mesh_2d = font.glyph_to_mesh_2d('A')?;
 
-// Generate a 3D mesh with depth
-let mesh_3d = font.glyph_to_mesh_3d('A', Quality::High, 5.0)?;
+// Generate a 3D mesh with custom quality (50 subdivisions per curve)
+let mesh_3d = font.glyph_by_char('A')?
+    .with_subdivisions(50)
+    .to_mesh_3d(5.0)?;
 ```
+
+## API Design
+
+fontmesh provides a simple, chainable API that works at different levels of abstraction:
+
+```rust
+// High-level: One-step mesh generation (uses default: 20 subdivisions)
+let mesh = font.glyph_to_mesh_3d('A', 5.0)?;
+
+// Mid-level: Chain operations with custom subdivisions
+let mesh = font.glyph_by_char('A')?
+    .with_subdivisions(50)
+    .to_mesh_3d(5.0)?;
+
+// Low-level: Access intermediate pipeline stages
+let glyph = font.glyph_by_char('A')?;
+let outline = glyph.linearize()?;  // Uses default subdivisions
+let mesh_2d = outline.triangulate()?;
+let mesh_3d = mesh_2d.extrude(&outline, 5.0)?;
+```
+
+This design lets you choose the right level of control for your use case. Access intermediate results when you need them (e.g., for vector graphics export or custom extrusion), or use the simple one-step API for common cases.
 
 ## Performance
 
@@ -47,20 +71,28 @@ Run benchmarks yourself: `cargo bench`
 # Basic usage
 cargo run --example basic
 
-# Efficient buffer reuse for batch processing
-cargo run --example buffer_reuse
+# Chainable API examples
+cargo run --example fluent_api
 
 # Export glyphs to OBJ format
 cargo run --example export_obj
 ```
 
-## How It Works
+## Pipeline
 
-1. Parse font with ttf-parser
-2. Extract glyph outline (Bezier curves)
-3. Linearize curves using adaptive subdivision
-4. Triangulate with lyon_tessellation
-5. Optional: Extrude to 3D with smooth normals
+The mesh generation pipeline consists of discrete, composable stages:
+
+1. **Font Loading** - Parse TrueType fonts with ttf-parser
+2. **Outline Extraction** - Get glyph Bezier curves
+3. **Linearization** - Convert curves to line segments using adaptive subdivision
+4. **Triangulation** - Generate 2D triangle mesh with lyon_tessellation
+5. **Extrusion** - Create 3D mesh with depth and smooth normals
+
+Each stage can be accessed individually, allowing you to:
+- Export vector outlines for SVG/PDF rendering
+- Reuse 2D meshes for multiple extrusion depths
+- Apply custom post-processing (e.g., `compute_smooth_normals`)
+- Implement custom rendering pipelines
 
 ## Dependencies
 

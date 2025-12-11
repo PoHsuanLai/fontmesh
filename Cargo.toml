@@ -17,18 +17,21 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 ttf-parser = "0.24"
-glam = "0.30"
+glam = { version = "0.30", features = ["fast-math"] }
 lyon_tessellation = "1.0"
+rustc-hash = "2.0"
 serde = { version = "1.0", optional = true, features = ["derive"] }
+ttf2mesh = { version = "0.2", optional = true }
+meshtext = { version = "0.3", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
-ttf2mesh = "0.2"
-meshtext = "0.3"
 
 [features]
 default = []
 serde = ["dep:serde", "glam/serde"]
+ttf2mesh = ["dep:ttf2mesh"]
+meshtext = ["dep:meshtext"]
 
 [[bench]]
 name = "comparison"

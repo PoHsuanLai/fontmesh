@@ -25,7 +25,19 @@ pub fn triangulate(outline: &Outline2D) -> Result<Mesh2D> {
         ));
     }
 
-    let mut geometry: VertexBuffers<[f32; 2], u32> = VertexBuffers::new();
+    // Pre-allocate buffers based on outline size
+    // Estimate: roughly 4x the number of outline points for vertices
+    // and ~3x vertices for indices (each triangle = 3 indices)
+    let point_count: usize = outline.contours.iter()
+        .map(|c| c.points.len())
+        .sum();
+    let estimated_vertices = point_count * 4;
+    let estimated_indices = estimated_vertices * 3;
+
+    let mut geometry: VertexBuffers<[f32; 2], u32> = VertexBuffers::with_capacity(
+        estimated_vertices,
+        estimated_indices
+    );
     let mut tessellator = FillTessellator::new();
 
     // Configure fill options (even-odd rule for font glyphs)

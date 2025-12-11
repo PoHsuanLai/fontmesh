@@ -1,25 +1,147 @@
 //! Glyph representation and outline extraction
 
 use crate::error::{FontMeshError, Result};
-use crate::types::{Contour, ContourPoint, Outline2D, Point2D, Quality};
+use crate::types::{Contour, ContourPoint, Outline2D, Point2D};
 use glam::Vec2;
 use ttf_parser::{Face, GlyphId, OutlineBuilder};
+
+/// Default quality for curve linearization (20 subdivisions per curve)
+const DEFAULT_QUALITY: u8 = 20;
 
 /// A glyph from a font
 pub struct Glyph<'a> {
     /// The character this glyph represents
-    pub character: char,
+    pub(crate) character: char,
     /// The glyph ID in the font
     pub(crate) glyph_id: GlyphId,
     /// Reference to the font face
     pub(crate) face: &'a Face<'a>,
     /// Horizontal advance width (normalized to 1.0 em)
-    pub advance: f32,
+    pub(crate) advance: f32,
     /// Glyph bounds [[x_min, y_min], [x_max, y_max]] (normalized)
-    pub bounds: Option<[[f32; 2]; 2]>,
+    pub(crate) bounds: Option<[[f32; 2]; 2]>,
+}
+
+/// Builder for creating meshes from a glyph with configurable subdivisions
+pub struct GlyphMeshBuilder<'a> {
+    glyph: &'a Glyph<'a>,
+    subdivisions: u8,
+}
+
+impl<'a> GlyphMeshBuilder<'a> {
+    /// Set the number of subdivisions per curve
+    ///
+    /// Higher values produce smoother curves but more vertices.
+    /// Default is 20 subdivisions per curve.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let mesh = font.glyph_by_char('A')?
+    ///     .with_subdivisions(50)
+    ///     .to_mesh_2d()?;
+    /// ```
+    #[must_use = "builder methods are intended to be chained"]
+    pub fn with_subdivisions(mut self, subdivisions: u8) -> Self {
+        self.subdivisions = subdivisions;
+        self
+    }
+
+    /// Convert to a 2D triangle mesh
+    #[must_use]
+    pub fn to_mesh_2d(self) -> Result<crate::types::Mesh2D> {
+        let outline = self.glyph.linearize_with(self.subdivisions)?;
+        crate::triangulate::triangulate(&outline)
+    }
+
+    /// Convert to a 3D triangle mesh with extrusion
+    #[must_use]
+    pub fn to_mesh_3d(self, depth: f32) -> Result<crate::types::Mesh3D> {
+        let outline = self.glyph.linearize_with(self.subdivisions)?;
+        let mesh_2d = crate::triangulate::triangulate(&outline)?;
+        crate::extrude::extrude(&mesh_2d, &outline, depth)
+    }
 }
 
 impl<'a> Glyph<'a> {
+    /// Get the character this glyph represents
+    ///
+    /// # Example
+    /// ```ignore
+    /// let glyph = font.glyph_by_char('A')?;
+    /// assert_eq!(glyph.character(), 'A');
+    /// ```
+    #[inline]
+    pub fn character(&self) -> char {
+        self.character
+    }
+
+    /// Get the glyph ID
+    ///
+    /// This is useful for caching, building lookup tables, or integrating
+    /// with text shaping libraries that work with glyph IDs.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let glyph = font.glyph_by_char('A')?;
+    /// let id = glyph.glyph_id();
+    /// // Store in cache: cache.insert(id, mesh);
+    /// ```
+    #[inline]
+    pub fn glyph_id(&self) -> GlyphId {
+        self.glyph_id
+    }
+
+    /// Get the horizontal advance width (normalized to 1.0 em)
+    ///
+    /// This value represents how far to advance horizontally after rendering
+    /// this glyph. It's normalized to 1.0 = 1 em (typically the font size).
+    ///
+    /// # Example
+    /// ```ignore
+    /// let glyph = font.glyph_by_char('A')?;
+    /// let width = glyph.advance();
+    /// ```
+    #[inline]
+    pub fn advance(&self) -> f32 {
+        self.advance
+    }
+
+    /// Get the glyph bounds (normalized to 1.0 em)
+    ///
+    /// Returns `[[x_min, y_min], [x_max, y_max]]` if the glyph has an outline,
+    /// or `None` for whitespace characters.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let glyph = font.glyph_by_char('A')?;
+    /// if let Some([[x_min, y_min], [x_max, y_max]]) = glyph.bounds() {
+    ///     println!("Glyph size: {}x{}", x_max - x_min, y_max - y_min);
+    /// }
+    /// ```
+    #[inline]
+    pub fn bounds(&self) -> Option<[[f32; 2]; 2]> {
+        self.bounds
+    }
+
+    /// Set the number of subdivisions per curve for mesh generation (builder pattern)
+    ///
+    /// Higher values produce smoother curves but more vertices.
+    /// Default is 20 subdivisions per curve.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let mesh = font.glyph_by_char('A')?
+    ///     .with_subdivisions(50)
+    ///     .to_mesh_2d()?;
+    /// ```
+    #[must_use = "builder methods are intended to be chained"]
+    pub fn with_subdivisions(&self, subdivisions: u8) -> GlyphMeshBuilder<'_> {
+        GlyphMeshBuilder {
+            glyph: self,
+            subdivisions,
+        }
+    }
+
     /// Extract the glyph's outline
     ///
     /// # Returns
@@ -41,15 +163,58 @@ impl<'a> Glyph<'a> {
 
     /// Linearize the glyph's outline by converting curves to line segments
     ///
-    /// # Arguments
-    /// * `quality` - The quality level for curve subdivision
+    /// Uses default quality (20 subdivisions per curve).
     ///
     /// # Returns
     /// A linearized outline ready for triangulation
     #[inline]
-    pub fn linearize(&self, quality: Quality) -> Result<Outline2D> {
+    pub fn linearize(&self) -> Result<Outline2D> {
+        self.linearize_with(DEFAULT_QUALITY)
+    }
+
+    /// Linearize the glyph's outline with custom number of subdivisions
+    ///
+    /// # Arguments
+    /// * `subdivisions` - Number of subdivisions per curve
+    ///
+    /// # Returns
+    /// A linearized outline ready for triangulation
+    #[inline]
+    pub fn linearize_with(&self, subdivisions: u8) -> Result<Outline2D> {
         let outline = self.outline()?;
-        crate::linearize::linearize_outline(outline, quality)
+        crate::linearize::linearize_outline(outline, subdivisions)
+    }
+
+    /// Convert this glyph to a 2D triangle mesh
+    ///
+    /// Uses default quality (20 subdivisions per curve).
+    ///
+    /// # Example
+    /// ```ignore
+    /// let mesh = font.glyph_by_char('A')?.to_mesh_2d()?;
+    /// ```
+    #[inline]
+    pub fn to_mesh_2d(&self) -> Result<crate::types::Mesh2D> {
+        let outline = self.linearize()?;
+        crate::triangulate::triangulate(&outline)
+    }
+
+    /// Convert this glyph to a 3D triangle mesh with extrusion
+    ///
+    /// Uses default quality (20 subdivisions per curve).
+    ///
+    /// # Arguments
+    /// * `depth` - The extrusion depth
+    ///
+    /// # Example
+    /// ```ignore
+    /// let mesh = font.glyph_by_char('A')?.to_mesh_3d(5.0)?;
+    /// ```
+    #[inline]
+    pub fn to_mesh_3d(&self, depth: f32) -> Result<crate::types::Mesh3D> {
+        let outline = self.linearize()?;
+        let mesh_2d = crate::triangulate::triangulate(&outline)?;
+        crate::extrude::extrude(&mesh_2d, &outline, depth)
     }
 }
 

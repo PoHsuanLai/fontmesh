@@ -8,7 +8,7 @@
 //! - Normal vector validity (normalized)
 //! - Mesh topology (closed, manifold)
 
-use fontmesh::{Font, Quality};
+use fontmesh::Font;
 
 const TEST_FONT: &[u8] = include_bytes!("../examples/test_font.ttf");
 
@@ -19,12 +19,12 @@ fn test_2d_mesh_structure() {
     // Test multiple characters
     for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".chars() {
         let mesh = font
-            .glyph_to_mesh_2d(c, Quality::Normal)
+            .glyph_to_mesh_2d(c)
             .unwrap_or_else(|_| panic!("Failed to generate mesh for '{}'", c));
 
         // Basic structure validation
         assert!(
-            mesh.vertex_count() > 0,
+            mesh.vertices.len() > 0,
             "Mesh for '{}' should have vertices",
             c
         );
@@ -37,11 +37,11 @@ fn test_2d_mesh_structure() {
         // All indices should be within vertex range
         for &idx in &mesh.indices {
             assert!(
-                (idx as usize) < mesh.vertex_count(),
+                (idx as usize) < mesh.vertices.len(),
                 "Index {} out of bounds for character '{}' with {} vertices",
                 idx,
                 c,
-                mesh.vertex_count()
+                mesh.vertices.len()
             );
         }
 
@@ -69,12 +69,12 @@ fn test_3d_mesh_structure() {
     for c in "ABCXYZ123".chars() {
         for depth in [1.0, 5.0, 10.0] {
             let mesh = font
-                .glyph_to_mesh_3d(c, Quality::Normal, depth)
+                .glyph_to_mesh_3d(c, depth)
                 .unwrap_or_else(|_| panic!("Failed to generate 3D mesh for '{}'", c));
 
             // Basic structure validation
             assert!(
-                mesh.vertex_count() > 0,
+                mesh.vertices.len() > 0,
                 "3D Mesh for '{}' should have vertices",
                 c
             );
@@ -93,11 +93,11 @@ fn test_3d_mesh_structure() {
             // All indices should be within vertex range
             for &idx in &mesh.indices {
                 assert!(
-                    (idx as usize) < mesh.vertex_count(),
+                    (idx as usize) < mesh.vertices.len(),
                     "Index {} out of bounds for character '{}' with {} vertices",
                     idx,
                     c,
-                    mesh.vertex_count()
+                    mesh.vertices.len()
                 );
             }
 
@@ -151,100 +151,94 @@ fn test_3d_mesh_structure() {
 fn test_quality_levels() {
     let font = Font::from_bytes(TEST_FONT).expect("Failed to load font");
 
-    let low = font.glyph_to_mesh_2d('S', Quality::Low).unwrap();
-    let normal = font.glyph_to_mesh_2d('S', Quality::Normal).unwrap();
-    let high = font.glyph_to_mesh_2d('S', Quality::High).unwrap();
+    let low = font.glyph_by_char('S').unwrap().with_subdivisions(10).to_mesh_2d().unwrap();
+    let normal = font.glyph_by_char('S').unwrap().with_subdivisions(20).to_mesh_2d().unwrap();
+    let high = font.glyph_by_char('S').unwrap().with_subdivisions(50).to_mesh_2d().unwrap();
 
     // Higher quality should generally produce more vertices
     // (for characters with curves like 'S')
     assert!(
-        low.vertex_count() <= normal.vertex_count(),
-        "Low quality should have <= vertices than normal"
+        low.vertices.len() <= normal.vertices.len(),
+        "Lower subdivisions should have <= vertices than normal"
     );
     assert!(
-        normal.vertex_count() <= high.vertex_count(),
-        "Normal quality should have <= vertices than high"
+        normal.vertices.len() <= high.vertices.len(),
+        "Default subdivisions should have <= vertices than high"
     );
 
     println!("Quality comparison for 'S':");
     println!(
-        "  Low: {} vertices, {} triangles",
-        low.vertex_count(),
+        "  subdivisions=10: {} vertices, {} triangles",
+        low.vertices.len(),
         low.triangle_count()
     );
     println!(
-        "  Normal: {} vertices, {} triangles",
-        normal.vertex_count(),
+        "  subdivisions=20: {} vertices, {} triangles",
+        normal.vertices.len(),
         normal.triangle_count()
     );
     println!(
-        "  High: {} vertices, {} triangles",
-        high.vertex_count(),
+        "  subdivisions=50: {} vertices, {} triangles",
+        high.vertices.len(),
         high.triangle_count()
     );
 }
 
 #[test]
-fn test_iterator_api() {
+fn test_direct_access() {
     let font = Font::from_bytes(TEST_FONT).expect("Failed to load font");
-    let mesh = font.glyph_to_mesh_3d('A', Quality::Normal, 5.0).unwrap();
+    let mesh = font.glyph_to_mesh_3d('A', 5.0).unwrap();
 
-    // Test vertex iterator
-    let vertex_count = mesh.iter_vertices().count();
-    assert_eq!(
-        vertex_count,
-        mesh.vertices.len(),
-        "Vertex iterator count should match"
+    // Test direct vertex access
+    assert!(
+        mesh.vertices.len() > 0,
+        "Mesh should have vertices"
     );
 
-    // Test normal iterator
-    let normal_count = mesh.iter_normals().unwrap().count();
+    // Test direct normal access
     assert_eq!(
-        normal_count,
         mesh.normals.len(),
-        "Normal iterator count should match"
+        mesh.vertices.len(),
+        "Should have one normal per vertex"
     );
 
-    // Test face iterator
-    let face_count = mesh.iter_faces().count();
+    // Test direct index access
     assert_eq!(
-        face_count,
-        mesh.indices.len() / 3,
-        "Face iterator count should match"
+        mesh.indices.len() % 3,
+        0,
+        "Indices should be multiple of 3"
     );
 
-    // Test vertex accessor
-    for vertex in mesh.iter_vertices().take(5) {
-        let (x, y, z) = vertex.val();
+    // Test vertex values
+    for vertex in mesh.vertices.iter().take(5) {
         assert!(
-            x.is_finite() && y.is_finite() && z.is_finite(),
+            vertex.x.is_finite() && vertex.y.is_finite() && vertex.z.is_finite(),
             "Vertex values should be finite"
         );
     }
 
-    // Test normal accessor
-    for normal in mesh.iter_normals().unwrap().take(5) {
-        let (nx, ny, nz) = normal.val();
-        let length_sq = nx * nx + ny * ny + nz * nz;
+    // Test normal values
+    for normal in mesh.normals.iter().take(5) {
+        let length_sq = normal.length_squared();
         assert!(
             (length_sq.sqrt() - 1.0).abs() < 0.01,
             "Normal should be normalized"
         );
     }
 
-    // Test face accessor
-    for face in mesh.iter_faces().take(5) {
-        let (i0, i1, i2) = face.val();
+    // Test face indices
+    for chunk in mesh.indices.chunks(3).take(5) {
+        let (i0, i1, i2) = (chunk[0], chunk[1], chunk[2]);
         assert!(
-            (i0 as usize) < mesh.vertex_count(),
+            (i0 as usize) < mesh.vertices.len(),
             "Face index 0 should be in bounds"
         );
         assert!(
-            (i1 as usize) < mesh.vertex_count(),
+            (i1 as usize) < mesh.vertices.len(),
             "Face index 1 should be in bounds"
         );
         assert!(
-            (i2 as usize) < mesh.vertex_count(),
+            (i2 as usize) < mesh.vertices.len(),
             "Face index 2 should be in bounds"
         );
     }
@@ -264,13 +258,13 @@ fn test_mesh_topology() {
     ];
 
     for (c, description) in test_chars {
-        let mesh = font.glyph_to_mesh_2d(c, Quality::Normal).unwrap();
+        let mesh = font.glyph_to_mesh_2d(c).unwrap();
 
         println!(
             "Character '{}' ({}): {} vertices, {} triangles",
             c,
             description,
-            mesh.vertex_count(),
+            mesh.vertices.len(),
             mesh.triangle_count()
         );
 
@@ -285,7 +279,7 @@ fn test_mesh_topology() {
         // where H is number of holes
         // For triangulated mesh: E = (3F + boundary_edges) / 2
         // This is approximate, just checking reasonable bounds
-        let v = mesh.vertex_count();
+        let v = mesh.vertices.len();
         let f = mesh.triangle_count();
 
         assert!(v >= 3, "Should have at least 3 vertices for '{}'", c);
@@ -301,17 +295,17 @@ fn test_special_characters() {
     let special = vec!['.', ',', '!', '?', '@', '#', '$', '%', '&', '*'];
 
     for c in special {
-        match font.glyph_to_mesh_2d(c, Quality::Normal) {
+        match font.glyph_to_mesh_2d(c) {
             Ok(mesh) => {
                 assert!(
-                    mesh.vertex_count() > 0,
+                    mesh.vertices.len() > 0,
                     "Special char '{}' should have vertices",
                     c
                 );
                 println!(
                     "Character '{}': {} vertices, {} triangles",
                     c,
-                    mesh.vertex_count(),
+                    mesh.vertices.len(),
                     mesh.triangle_count()
                 );
             }
@@ -331,8 +325,8 @@ fn test_depth_consistency() {
     let mut vertex_counts = Vec::new();
 
     for &depth in &depths {
-        let mesh = font.glyph_to_mesh_3d('M', Quality::Normal, depth).unwrap();
-        vertex_counts.push(mesh.vertex_count());
+        let mesh = font.glyph_to_mesh_3d('M', depth).unwrap();
+        vertex_counts.push(mesh.vertices.len());
 
         // Check that all vertices respect the depth
         for vertex in &mesh.vertices {
@@ -349,7 +343,7 @@ fn test_depth_consistency() {
         println!(
             "Depth {}: {} vertices, {} triangles",
             depth,
-            mesh.vertex_count(),
+            mesh.vertices.len(),
             mesh.triangle_count()
         );
     }
@@ -372,7 +366,7 @@ fn test_error_handling() {
     let rare_chars = vec!['\u{1F600}', '\u{2603}', '\u{FFFF}'];
 
     for c in rare_chars {
-        match font.glyph_to_mesh_2d(c, Quality::Normal) {
+        match font.glyph_to_mesh_2d(c) {
             Ok(_) => {
                 println!("Character U+{:04X} is available", c as u32);
             }

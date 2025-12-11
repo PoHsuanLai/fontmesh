@@ -1,19 +1,18 @@
 //! Example: Export glyphs to Wavefront OBJ format
 
-use fontmesh::{Font, Quality};
+use fontmesh::Font;
 use std::fs::File;
 use std::io::Write;
 
 fn main() {
-    let font_data = include_bytes!("test_font.ttf");
-    let font = Font::from_bytes(font_data).expect("Failed to load font");
+    let font = Font::from_bytes(include_bytes!("test_font.ttf")).expect("Failed to load font");
 
     println!("Exporting glyphs to OBJ files...\n");
 
     // Export a single 2D glyph
     export_2d_glyph(&font, 'A', "glyph_A_2d.obj");
 
-    // Export a single 3D glyph
+    // Export a single 3D glyph with custom quality
     export_3d_glyph(&font, 'B', "glyph_B_3d.obj", 10.0);
 
     // Export a string as separate objects
@@ -24,13 +23,16 @@ fn main() {
 
 fn export_2d_glyph(font: &Font, c: char, filename: &str) {
     let mesh = font
-        .glyph_to_mesh_2d(c, Quality::High)
+        .glyph_by_char(c)
+        .expect("Failed to get glyph")
+        .with_subdivisions(50)
+        .to_mesh_2d()
         .expect("Failed to generate 2D mesh");
 
     let mut file = File::create(filename).expect("Failed to create file");
 
     writeln!(file, "# Fontmesh 2D glyph: '{}'", c).unwrap();
-    writeln!(file, "# Vertices: {}", mesh.vertex_count()).unwrap();
+    writeln!(file, "# Vertices: {}", mesh.vertices.len()).unwrap();
     writeln!(file, "# Triangles: {}", mesh.triangle_count()).unwrap();
     writeln!(file).unwrap();
 
@@ -51,13 +53,16 @@ fn export_2d_glyph(font: &Font, c: char, filename: &str) {
 
 fn export_3d_glyph(font: &Font, c: char, filename: &str, depth: f32) {
     let mesh = font
-        .glyph_to_mesh_3d(c, Quality::High, depth)
+        .glyph_by_char(c)
+        .expect("Failed to get glyph")
+        .with_subdivisions(50)
+        .to_mesh_3d(depth)
         .expect("Failed to generate 3D mesh");
 
     let mut file = File::create(filename).expect("Failed to create file");
 
     writeln!(file, "# Fontmesh 3D glyph: '{}'", c).unwrap();
-    writeln!(file, "# Vertices: {}", mesh.vertex_count()).unwrap();
+    writeln!(file, "# Vertices: {}", mesh.vertices.len()).unwrap();
     writeln!(file, "# Triangles: {}", mesh.triangle_count()).unwrap();
     writeln!(file, "# Depth: {}", depth).unwrap();
     writeln!(file).unwrap();
@@ -103,8 +108,8 @@ fn export_string(font: &Font, text: &str, filename: &str, depth: f32) {
 
     for c in text.chars() {
         let glyph = font.glyph_by_char(c).expect("Glyph not found");
-        let mesh = font
-            .glyph_to_mesh_3d(c, Quality::Normal, depth)
+        let mesh = glyph
+            .to_mesh_3d(depth)
             .expect("Failed to generate mesh");
 
         writeln!(file, "o glyph_{}", c).unwrap();
@@ -140,8 +145,8 @@ fn export_string(font: &Font, text: &str, filename: &str, depth: f32) {
 
         writeln!(file).unwrap();
 
-        vertex_offset += mesh.vertex_count() as u32;
-        x_position += glyph.advance * 1.2; // Add some spacing
+        vertex_offset += mesh.vertices.len() as u32;
+        x_position += glyph.advance() * 1.2; // Add some spacing
     }
 
     println!("  Exported string '{}' -> {}", text, filename);

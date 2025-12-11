@@ -2,7 +2,6 @@
 
 use crate::error::{FontMeshError, Result};
 use crate::glyph::Glyph;
-use crate::types::{Mesh2D, Mesh3D, Quality};
 use ttf_parser::{Face, GlyphId};
 
 /// A loaded TrueType font
@@ -38,17 +37,41 @@ impl<'a> Font<'a> {
     ///
     /// # Returns
     /// The glyph for the character, or an error if not found
+    ///
+    /// # Example
+    /// ```ignore
+    /// let glyph = font.glyph_by_char('A')?;
+    /// println!("Advance: {}", glyph.advance);
+    /// ```
     pub fn glyph_by_char(&self, c: char) -> Result<Glyph<'_>> {
         let glyph_id = self
             .face
             .glyph_index(c)
             .ok_or(FontMeshError::GlyphNotFound(c))?;
 
-        self.glyph_by_id(glyph_id, c)
+        Ok(self.glyph_by_id(glyph_id, c))
     }
 
-    /// Get a glyph by its ID
-    fn glyph_by_id(&self, glyph_id: GlyphId, character: char) -> Result<Glyph<'_>> {
+    /// Get a glyph by its glyph ID
+    ///
+    /// This is useful when working with text shaping libraries or when you
+    /// already have glyph IDs from other sources (e.g., `rustybuzz`, `cosmic-text`).
+    ///
+    /// # Arguments
+    /// * `glyph_id` - The glyph ID to look up
+    /// * `character` - The character this glyph represents (for display purposes)
+    ///
+    /// # Returns
+    /// A glyph with metrics and outline information
+    ///
+    /// # Example
+    /// ```ignore
+    /// use ttf_parser::GlyphId;
+    ///
+    /// let glyph_id = GlyphId(42);
+    /// let glyph = font.glyph_by_id(glyph_id, 'A');
+    /// ```
+    pub fn glyph_by_id(&self, glyph_id: GlyphId, character: char) -> Glyph<'_> {
         // Get horizontal metrics
         let h_metrics = self.face.glyph_hor_advance(glyph_id).unwrap_or(0);
         let advance = h_metrics as f32 / self.face.units_per_em() as f32;
@@ -64,13 +87,34 @@ impl<'a> Font<'a> {
             ]
         });
 
-        Ok(Glyph {
+        Glyph {
             character,
             glyph_id,
             face: &self.face,
             advance,
             bounds,
-        })
+        }
+    }
+
+    /// Access the underlying ttf-parser Face for advanced operations
+    ///
+    /// This allows you to use any ttf-parser functionality directly,
+    /// such as accessing font tables, kerning information, or other
+    /// font metadata that fontmesh doesn't expose.
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Get kerning between two glyphs
+    /// let face = font.face();
+    /// let kern = face.kerning_subtables();
+    ///
+    /// // Access font name
+    /// for name in face.names() {
+    ///     println!("{:?}: {}", name.name_id, name.to_string());
+    /// }
+    /// ```
+    pub fn face(&self) -> &Face<'a> {
+        &self.face
     }
 
     /// Get the font's units per em
@@ -91,87 +135,6 @@ impl<'a> Font<'a> {
     /// Get the font's line gap
     pub fn line_gap(&self) -> f32 {
         self.face.line_gap() as f32 / self.face.units_per_em() as f32
-    }
-
-    /// Convert a character to a 2D mesh, reusing an existing buffer
-    ///
-    /// This is more efficient than `glyph_to_mesh_2d()` when converting many glyphs,
-    /// as it reuses allocated memory instead of allocating new vectors each time.
-    ///
-    /// # Arguments
-    /// * `c` - The character to convert
-    /// * `quality` - Quality level for curve subdivision
-    /// * `mesh` - Existing mesh to write into (will be cleared first)
-    ///
-    /// # Example
-    /// ```ignore
-    /// let mut mesh = Mesh2D::new();
-    /// for c in "Hello".chars() {
-    ///     font.glyph_to_mesh_2d_reuse(c, Quality::Normal, &mut mesh)?;
-    ///     // Use mesh...
-    /// }
-    /// ```
-    #[inline]
-    pub fn glyph_to_mesh_2d_reuse(
-        &self,
-        c: char,
-        quality: Quality,
-        mesh: &mut Mesh2D,
-    ) -> Result<()> {
-        mesh.clear();
-        let glyph = self.glyph_by_char(c)?;
-        match glyph.outline() {
-            Ok(outline) => {
-                let linearized = crate::linearize::linearize_outline(outline, quality)?;
-                let new_mesh = crate::triangulate::triangulate(&linearized)?;
-                *mesh = new_mesh;
-                Ok(())
-            }
-            Err(FontMeshError::NoOutline) => Ok(()), // Leave mesh empty for space/whitespace
-            Err(e) => Err(e),
-        }
-    }
-
-    /// Convert a character to a 3D mesh, reusing an existing buffer
-    ///
-    /// This is more efficient than `glyph_to_mesh_3d()` when converting many glyphs,
-    /// as it reuses allocated memory instead of allocating new vectors each time.
-    ///
-    /// # Arguments
-    /// * `c` - The character to convert
-    /// * `quality` - Quality level for curve subdivision
-    /// * `depth` - Extrusion depth
-    /// * `mesh` - Existing mesh to write into (will be cleared first)
-    ///
-    /// # Example
-    /// ```ignore
-    /// let mut mesh = Mesh3D::new();
-    /// for c in "Hello".chars() {
-    ///     font.glyph_to_mesh_3d_reuse(c, Quality::Normal, 1.0, &mut mesh)?;
-    ///     // Use mesh...
-    /// }
-    /// ```
-    #[inline]
-    pub fn glyph_to_mesh_3d_reuse(
-        &self,
-        c: char,
-        quality: Quality,
-        depth: f32,
-        mesh: &mut Mesh3D,
-    ) -> Result<()> {
-        mesh.clear();
-        let glyph = self.glyph_by_char(c)?;
-        match glyph.outline() {
-            Ok(outline) => {
-                let linearized = crate::linearize::linearize_outline(outline, quality)?;
-                let mesh_2d = crate::triangulate::triangulate(&linearized)?;
-                let new_mesh = crate::extrude::extrude(&mesh_2d, &linearized, depth)?;
-                *mesh = new_mesh;
-                Ok(())
-            }
-            Err(FontMeshError::NoOutline) => Ok(()), // Leave mesh empty for space/whitespace
-            Err(e) => Err(e),
-        }
     }
 }
 

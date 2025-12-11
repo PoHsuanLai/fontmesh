@@ -3,7 +3,7 @@
 use crate::error::Result;
 use crate::types::{Mesh2D, Mesh3D, Outline2D};
 use glam::Vec3;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 /// Extrude a 2D mesh into 3D with the given depth
 ///
@@ -203,10 +203,23 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
 }
 
 /// Compute smooth normals for a mesh (optional post-processing)
-#[allow(dead_code)]
+///
+/// This function recomputes normals by averaging face normals at shared vertices,
+/// resulting in smoother shading. Useful for post-processing or applying to custom meshes.
+///
+/// # Arguments
+/// * `mesh` - The mesh to recompute normals for (modified in-place)
+///
+/// # Example
+/// ```ignore
+/// use fontmesh::{Font, Quality, compute_smooth_normals};
+///
+/// let mut mesh = font.glyph_to_mesh_3d('A', Quality::High, 5.0)?;
+/// compute_smooth_normals(&mut mesh);
+/// ```
 pub fn compute_smooth_normals(mesh: &mut Mesh3D) {
     // Group vertices by position to find shared vertices
-    let mut position_map: HashMap<[i32; 3], Vec<usize>> = HashMap::new();
+    let mut position_map: FxHashMap<[i32; 3], Vec<usize>> = FxHashMap::default();
 
     // Quantize positions for matching (to handle floating point imprecision)
     const QUANTIZE: f32 = 10000.0;
@@ -240,28 +253,37 @@ pub fn compute_smooth_normals(mesh: &mut Mesh3D) {
         accumulated_normals[i2] += face_normal;
     }
 
+    // Track which vertices have been processed (for shared positions)
+    let mut processed = vec![false; mesh.vertices.len()];
+
     // Average normals for vertices at the same position
     for indices in position_map.values() {
         if indices.len() <= 1 {
-            continue;
-        }
+            // Single vertex at this position - just normalize its accumulated normal
+            let idx = indices[0];
+            if accumulated_normals[idx] != Vec3::ZERO {
+                mesh.normals[idx] = accumulated_normals[idx].normalize();
+                processed[idx] = true;
+            }
+        } else {
+            // Multiple vertices at same position - average their normals
+            let mut sum = Vec3::ZERO;
+            for &idx in indices {
+                sum += accumulated_normals[idx];
+            }
+            let averaged = sum.normalize();
 
-        // Sum all normals for this position
-        let mut sum = Vec3::ZERO;
-        for &idx in indices {
-            sum += accumulated_normals[idx];
-        }
-        let averaged = sum.normalize();
-
-        // Apply to all vertices at this position
-        for &idx in indices {
-            mesh.normals[idx] = averaged;
+            // Apply averaged normal to all vertices at this position
+            for &idx in indices {
+                mesh.normals[idx] = averaged;
+                processed[idx] = true;
+            }
         }
     }
 
-    // Normalize all normals
+    // Normalize any remaining normals (shouldn't happen, but be safe)
     for (i, normal) in mesh.normals.iter_mut().enumerate() {
-        if accumulated_normals[i] != Vec3::ZERO {
+        if !processed[i] && accumulated_normals[i] != Vec3::ZERO {
             *normal = accumulated_normals[i].normalize();
         }
     }
@@ -297,7 +319,7 @@ mod tests {
         let mesh_3d = extrude(&mesh_2d, &outline, 1.0).expect("Extrusion should succeed");
 
         // Should have front face, back face, and 4 side faces
-        assert!(mesh_3d.vertex_count() > 0);
+        assert!(mesh_3d.vertices.len() > 0);
         assert!(mesh_3d.triangle_count() > 0);
         assert_eq!(mesh_3d.vertices.len(), mesh_3d.normals.len());
     }
