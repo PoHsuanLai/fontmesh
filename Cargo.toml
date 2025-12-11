@@ -34,5 +34,5 @@ ttf2mesh = ["dep:ttf2mesh"]
 meshtext = ["dep:meshtext"]
 
 [[bench]]
-name = "comparison"
+name = "comprehensive"
 harness = false
