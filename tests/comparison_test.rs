@@ -151,9 +151,24 @@ fn test_3d_mesh_structure() {
 fn test_quality_levels() {
     let font = Font::from_bytes(TEST_FONT).expect("Failed to load font");
 
-    let low = font.glyph_by_char('S').unwrap().with_subdivisions(10).to_mesh_2d().unwrap();
-    let normal = font.glyph_by_char('S').unwrap().with_subdivisions(20).to_mesh_2d().unwrap();
-    let high = font.glyph_by_char('S').unwrap().with_subdivisions(50).to_mesh_2d().unwrap();
+    let low = font
+        .glyph_by_char('S')
+        .unwrap()
+        .with_subdivisions(10)
+        .to_mesh_2d()
+        .unwrap();
+    let normal = font
+        .glyph_by_char('S')
+        .unwrap()
+        .with_subdivisions(20)
+        .to_mesh_2d()
+        .unwrap();
+    let high = font
+        .glyph_by_char('S')
+        .unwrap()
+        .with_subdivisions(50)
+        .to_mesh_2d()
+        .unwrap();
 
     // Higher quality should generally produce more vertices
     // (for characters with curves like 'S')
@@ -190,10 +205,7 @@ fn test_direct_access() {
     let mesh = font.glyph_to_mesh_3d('A', 5.0).unwrap();
 
     // Test direct vertex access
-    assert!(
-        mesh.vertices.len() > 0,
-        "Mesh should have vertices"
-    );
+    assert!(mesh.vertices.len() > 0, "Mesh should have vertices");
 
     // Test direct normal access
     assert_eq!(
@@ -203,11 +215,7 @@ fn test_direct_access() {
     );
 
     // Test direct index access
-    assert_eq!(
-        mesh.indices.len() % 3,
-        0,
-        "Indices should be multiple of 3"
-    );
+    assert_eq!(mesh.indices.len() % 3, 0, "Indices should be multiple of 3");
 
     // Test vertex values
     for vertex in mesh.vertices.iter().take(5) {

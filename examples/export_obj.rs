@@ -108,9 +108,7 @@ fn export_string(font: &Font, text: &str, filename: &str, depth: f32) {
 
     for c in text.chars() {
         let glyph = font.glyph_by_char(c).expect("Glyph not found");
-        let mesh = glyph
-            .to_mesh_3d(depth)
-            .expect("Failed to generate mesh");
+        let mesh = glyph.to_mesh_3d(depth).expect("Failed to generate mesh");
 
         writeln!(file, "o glyph_{}", c).unwrap();
 

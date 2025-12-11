@@ -98,7 +98,13 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
                 // Have on-curve + off-curve, expecting end point
                 if cp.on_curve {
                     // Standard curve: on-off-on
-                    linearize_qbezier(last_point, control_point, cp.point, subdivisions, &mut result);
+                    linearize_qbezier(
+                        last_point,
+                        control_point,
+                        cp.point,
+                        subdivisions,
+                        &mut result,
+                    );
                     result.push_on_curve(cp.point);
                     LinearizeState::OnCurve {
                         last_point: cp.point,
@@ -125,7 +131,13 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
     } = state
     {
         if contour.closed {
-            linearize_qbezier(last_point, control_point, first_point, subdivisions, &mut result);
+            linearize_qbezier(
+                last_point,
+                control_point,
+                first_point,
+                subdivisions,
+                &mut result,
+            );
         }
     }
 
@@ -195,7 +207,13 @@ fn remove_collinear_points(contour: &mut Contour) {
 /// This matches the ttf2mesh approach: calculate the angle between tangents
 /// at t=0 and t=1, then determine the number of subdivisions based on that angle.
 #[inline(always)]
-fn linearize_qbezier(p0: Point2D, p1: Point2D, p2: Point2D, subdivisions: u8, result: &mut Contour) {
+fn linearize_qbezier(
+    p0: Point2D,
+    p1: Point2D,
+    p2: Point2D,
+    subdivisions: u8,
+    result: &mut Contour,
+) {
     // Check if the curve is nearly linear using triangle area (Heron's formula)
     let area = triangle_area(p0, p1, p2);
     if area < AREA_THRESHOLD {

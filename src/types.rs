@@ -97,14 +97,19 @@ impl Outline2D {
     /// Triangulate this outline into a 2D mesh (fluent API)
     ///
     /// # Returns
-    /// A 2D triangle mesh
+    /// Convert this outline to a 2D triangle mesh
     ///
     /// # Example
-    /// ```ignore
-    /// let mesh = glyph.linearize(Quality::High)?.triangulate()?;
+    /// ```
+    /// use fontmesh::Font;
+    ///
+    /// let font = Font::from_bytes(include_bytes!("../examples/test_font.ttf"))?;
+    /// let glyph = font.glyph_by_char('A')?;
+    /// let outline = glyph.with_subdivisions(20).to_outline()?;
+    /// let mesh = outline.triangulate()?;
+    /// # Ok::<(), fontmesh::FontMeshError>(())
     /// ```
     #[inline]
-    #[must_use]
     pub fn triangulate(&self) -> crate::error::Result<Mesh2D> {
         crate::triangulate::triangulate(self)
     }
@@ -118,11 +123,16 @@ impl Outline2D {
     /// A 3D triangle mesh with normals
     ///
     /// # Example
-    /// ```ignore
-    /// let mesh = glyph.linearize(Quality::High)?.to_mesh_3d(5.0)?;
+    /// ```
+    /// use fontmesh::Font;
+    ///
+    /// let font = Font::from_bytes(include_bytes!("../examples/test_font.ttf"))?;
+    /// let glyph = font.glyph_by_char('A')?;
+    /// let outline = glyph.with_subdivisions(30).to_outline()?;
+    /// let mesh = outline.to_mesh_3d(5.0)?;
+    /// # Ok::<(), fontmesh::FontMeshError>(())
     /// ```
     #[inline]
-    #[must_use]
     pub fn to_mesh_3d(&self, depth: f32) -> crate::error::Result<Mesh3D> {
         let mesh_2d = self.triangulate()?;
         crate::extrude::extrude(&mesh_2d, self, depth)
@@ -168,13 +178,17 @@ impl Mesh2D {
     /// A 3D triangle mesh with normals
     ///
     /// # Example
-    /// ```ignore
-    /// let outline = glyph.linearize(Quality::High)?;
+    /// ```
+    /// use fontmesh::Font;
+    ///
+    /// let font = Font::from_bytes(include_bytes!("../examples/test_font.ttf"))?;
+    /// let glyph = font.glyph_by_char('A')?;
+    /// let outline = glyph.with_subdivisions(30).to_outline()?;
     /// let mesh_2d = outline.triangulate()?;
     /// let mesh_3d = mesh_2d.extrude(&outline, 5.0)?;
+    /// # Ok::<(), fontmesh::FontMeshError>(())
     /// ```
     #[inline]
-    #[must_use]
     pub fn extrude(&self, outline: &Outline2D, depth: f32) -> crate::error::Result<Mesh3D> {
         crate::extrude::extrude(self, outline, depth)
     }

@@ -15,7 +15,11 @@ fn main() {
         .expect("Failed to get glyph")
         .to_mesh_2d()
         .expect("Failed to generate mesh");
-    println!("   'A': {} vertices, {} triangles", mesh_2d.vertices.len(), mesh_2d.triangle_count());
+    println!(
+        "   'A': {} vertices, {} triangles",
+        mesh_2d.vertices.len(),
+        mesh_2d.triangle_count()
+    );
 
     // Example 2: Fluent 3D mesh generation with custom quality
     println!("\n2. Fluent 3D mesh generation (custom quality: 50):");
@@ -25,7 +29,11 @@ fn main() {
         .with_subdivisions(50)
         .to_mesh_3d(5.0)
         .expect("Failed to generate mesh");
-    println!("   'B': {} vertices, {} triangles", mesh_3d.vertices.len(), mesh_3d.triangle_count());
+    println!(
+        "   'B': {} vertices, {} triangles",
+        mesh_3d.vertices.len(),
+        mesh_3d.triangle_count()
+    );
 
     // Example 3: Access intermediate pipeline stages
     println!("\n3. Pipeline with intermediate stages:");
@@ -48,9 +56,15 @@ fn main() {
     let mesh_2d = outline.triangulate().expect("Failed to triangulate");
 
     for depth in &[1.0, 5.0, 10.0] {
-        let mesh_3d = mesh_2d.extrude(&outline, *depth).expect("Failed to extrude");
-        println!("   Depth {}: {} vertices, {} triangles",
-                 depth, mesh_3d.vertices.len(), mesh_3d.triangle_count());
+        let mesh_3d = mesh_2d
+            .extrude(&outline, *depth)
+            .expect("Failed to extrude");
+        println!(
+            "   Depth {}: {} vertices, {} triangles",
+            depth,
+            mesh_3d.vertices.len(),
+            mesh_3d.triangle_count()
+        );
     }
 
     // Example 5: Direct outline to 3D (skip 2D mesh variable)
@@ -62,13 +76,18 @@ fn main() {
         .expect("Failed to linearize")
         .to_mesh_3d(5.0)
         .expect("Failed to create 3D mesh");
-    println!("   'E': {} vertices, {} triangles", mesh_3d.vertices.len(), mesh_3d.triangle_count());
+    println!(
+        "   'E': {} vertices, {} triangles",
+        mesh_3d.vertices.len(),
+        mesh_3d.triangle_count()
+    );
 
     // Example 6: Compare with traditional API
     println!("\n6. Traditional vs Fluent API:");
 
     // Traditional (uses default quality)
-    let traditional = font.glyph_to_mesh_3d('F', 5.0)
+    let traditional = font
+        .glyph_to_mesh_3d('F', 5.0)
         .expect("Failed to generate mesh");
     println!("   Traditional: {} vertices", traditional.vertices.len());
 
@@ -87,7 +106,10 @@ fn main() {
         .with_subdivisions(30)
         .to_mesh_3d(5.0)
         .expect("Failed to generate mesh");
-    println!("   Fluent (subdivisions=30): {} vertices", custom.vertices.len());
+    println!(
+        "   Fluent (subdivisions=30): {} vertices",
+        custom.vertices.len()
+    );
 
     println!("\n✓ All fluent API examples completed!");
 }

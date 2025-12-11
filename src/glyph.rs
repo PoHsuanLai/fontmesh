@@ -46,15 +46,18 @@ impl<'a> GlyphMeshBuilder<'a> {
         self
     }
 
+    /// Convert to a linearized outline
+    pub fn to_outline(self) -> Result<crate::types::Outline2D> {
+        self.glyph.linearize_with(self.subdivisions)
+    }
+
     /// Convert to a 2D triangle mesh
-    #[must_use]
     pub fn to_mesh_2d(self) -> Result<crate::types::Mesh2D> {
         let outline = self.glyph.linearize_with(self.subdivisions)?;
         crate::triangulate::triangulate(&outline)
     }
 
     /// Convert to a 3D triangle mesh with extrusion
-    #[must_use]
     pub fn to_mesh_3d(self, depth: f32) -> Result<crate::types::Mesh3D> {
         let outline = self.glyph.linearize_with(self.subdivisions)?;
         let mesh_2d = crate::triangulate::triangulate(&outline)?;

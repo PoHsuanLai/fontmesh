@@ -205,17 +205,26 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
 /// Compute smooth normals for a mesh (optional post-processing)
 ///
 /// This function recomputes normals by averaging face normals at shared vertices,
-/// resulting in smoother shading. Useful for post-processing or applying to custom meshes.
+/// resulting in smoother shading. The extrude process already generates smooth normals
+/// for side faces, but this can be used if you want to regenerate them or apply to
+/// a custom mesh.
+///
+/// **Note:** In most cases, you don't need to call this manually - the 3D extrusion
+/// already produces smooth normals.
 ///
 /// # Arguments
 /// * `mesh` - The mesh to recompute normals for (modified in-place)
 ///
 /// # Example
-/// ```ignore
-/// use fontmesh::{Font, Quality, compute_smooth_normals};
+/// ```
+/// use fontmesh::{Font, compute_smooth_normals};
 ///
-/// let mut mesh = font.glyph_to_mesh_3d('A', Quality::High, 5.0)?;
+/// let font = Font::from_bytes(include_bytes!("../examples/test_font.ttf"))?;
+/// let mut mesh = font.glyph_to_mesh_3d('A', 5.0)?;
+///
+/// // Regenerate smooth normals (usually not needed)
 /// compute_smooth_normals(&mut mesh);
+/// # Ok::<(), fontmesh::FontMeshError>(())
 /// ```
 pub fn compute_smooth_normals(mesh: &mut Mesh3D) {
     // Group vertices by position to find shared vertices

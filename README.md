@@ -8,12 +8,12 @@
 A fast Rust library for converting TrueType font glyphs to 2D and 3D triangle meshes. Providing a faster, pure rust alternative for [ttf2mesh](https://github.com/blaind/ttf2mesh-rs)
 
 <p align="center">
-  <img src="images/glyph_2d.png" width="45%" alt="2D Mesh" />
-  <img src="images/glyph_3d.png" width="45%" alt="3D Mesh" />
+  <img src="images/fontmesh_logo.png" width="70%" alt="3D Text" />
 </p>
 
 <p align="center">
-  <img src="images/text_3d.png" width="70%" alt="3D Text" />
+  <img src="images/glyph_2d.png" width="45%" alt="2D Mesh" />
+  <img src="images/glyph_3d.png" width="45%" alt="3D Mesh" />
 </p>
 
 ## Quick Start
@@ -33,9 +33,9 @@ let mesh_3d = font.glyph_by_char('A')?
     .to_mesh_3d(5.0)?;
 ```
 
-## API Design
+## API
 
-fontmesh provides a simple, chainable API that works at different levels of abstraction:
+fontmesh provides a chainable API that works at different levels of abstraction:
 
 ```rust
 // High-level: One-step mesh generation (uses default: 20 subdivisions)
@@ -53,17 +53,16 @@ let mesh_2d = outline.triangulate()?;
 let mesh_3d = mesh_2d.extrude(&outline, 5.0)?;
 ```
 
-This design lets you choose the right level of control for your use case. Access intermediate results when you need them (e.g., for vector graphics export or custom extrusion), or use the simple one-step API for common cases.
 
 ## Performance
 
-fontmesh is **2-3x faster** than comparable libraries, with robust triangulation via Lyon.
+fontmesh is **2-3x faster** than comparable libraries, with the incredible Lyon.
 
 <p align="center">
   <img src="images/benchmark.png" width="85%" alt="Benchmark Comparison" />
 </p>
 
-Run benchmarks yourself: `cargo bench`
+Run benchmarks yourself: `cargo bench --all-features`
 
 ## Examples
 
@@ -80,7 +79,7 @@ cargo run --example export_obj
 
 ## Pipeline
 
-The mesh generation pipeline consists of discrete, composable stages:
+The mesh generation pipeline consists of the following stages:
 
 1. **Font Loading** - Parse TrueType fonts with ttf-parser
 2. **Outline Extraction** - Get glyph Bezier curves
@@ -93,12 +92,6 @@ Each stage can be accessed individually, allowing you to:
 - Reuse 2D meshes for multiple extrusion depths
 - Apply custom post-processing (e.g., `compute_smooth_normals`)
 - Implement custom rendering pipelines
-
-## Dependencies
-
-- **ttf-parser** - Font parsing (pure Rust, no_std)
-- **lyon_tessellation** - Robust triangulation
-- **glam** - Vector math
 
 ## License
 
