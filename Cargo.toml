@@ -1,6 +1,6 @@
 [package]
 name = "fontmesh"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2021"
 authors = ["Po Hsuan Lai <pohsuanlai0208@gmail.com>"]
 license = "MIT"
@@ -10,6 +10,10 @@ readme = "README.md"
 keywords = ["ttf2mesh", "ttf2mesh-rs", "mesh", "ttf", "triangulation"]
 categories = ["graphics", "game-development", "rendering"]
 documentation = "https://docs.rs/fontmesh"
+exclude = [
+    ".github/",
+    "benches/",
+]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -21,17 +25,14 @@ glam = { version = "0.30", features = ["fast-math"] }
 lyon_tessellation = "1.0"
 rustc-hash = "2.0"
 serde = { version = "1.0", optional = true, features = ["derive"] }
-ttf2mesh = { version = "0.2", optional = true }
-meshtext = { version = "0.3", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
+serde_json = "1.0"
 
 [features]
 default = []
 serde = ["dep:serde", "glam/serde"]
-ttf2mesh = ["dep:ttf2mesh"]
-meshtext = ["dep:meshtext"]
 
 [[bench]]
 name = "comprehensive"

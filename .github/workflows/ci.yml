@@ -56,7 +56,7 @@ jobs:
         run: cargo build --release --all-features
 
       - name: Build examples
-        run: cargo build --examples --release
+        run: cargo build --examples --release --all-features
 
   fmt:
     name: Formatting

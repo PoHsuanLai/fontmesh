@@ -19,12 +19,12 @@ const AREA_THRESHOLD: f32 = 1e-5;
 pub fn linearize_outline(outline: Outline2D, subdivisions: u8) -> Result<Outline2D> {
     let mut result = Outline2D::new();
 
-    for contour in outline.contours {
-        let linearized = linearize_contour(&contour, subdivisions);
-        if !linearized.is_empty() {
-            result.add_contour(linearized);
-        }
-    }
+    outline
+        .contours
+        .into_iter()
+        .map(|contour| linearize_contour(&contour, subdivisions))
+        .filter(|linearized| !linearized.is_empty())
+        .for_each(|linearized| result.add_contour(linearized));
 
     Ok(result)
 }
@@ -273,10 +273,10 @@ fn linearize_qbezier(
     }
 
     // Handle remaining points
-    for _ in 0..(num_points % batch_size) {
+    (0..(num_points % batch_size)).fold(t, |t, _| {
         result.push_on_curve(qbezier(p0, p1, p2, t));
-        t += step;
-    }
+        t + step
+    });
 }
 
 /// Evaluate a quadratic Bezier curve at parameter t

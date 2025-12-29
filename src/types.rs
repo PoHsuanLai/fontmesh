@@ -103,7 +103,7 @@ impl Outline2D {
     /// ```
     /// use fontmesh::Font;
     ///
-    /// let font = Font::from_bytes(include_bytes!("../examples/test_font.ttf"))?;
+    /// let font = Font::from_bytes(include_bytes!("../assets/test_font.ttf"))?;
     /// let glyph = font.glyph_by_char('A')?;
     /// let outline = glyph.with_subdivisions(20).to_outline()?;
     /// let mesh = outline.triangulate()?;
@@ -126,7 +126,7 @@ impl Outline2D {
     /// ```
     /// use fontmesh::Font;
     ///
-    /// let font = Font::from_bytes(include_bytes!("../examples/test_font.ttf"))?;
+    /// let font = Font::from_bytes(include_bytes!("../assets/test_font.ttf"))?;
     /// let glyph = font.glyph_by_char('A')?;
     /// let outline = glyph.with_subdivisions(30).to_outline()?;
     /// let mesh = outline.to_mesh_3d(5.0)?;
@@ -181,7 +181,7 @@ impl Mesh2D {
     /// ```
     /// use fontmesh::Font;
     ///
-    /// let font = Font::from_bytes(include_bytes!("../examples/test_font.ttf"))?;
+    /// let font = Font::from_bytes(include_bytes!("../assets/test_font.ttf"))?;
     /// let glyph = font.glyph_by_char('A')?;
     /// let outline = glyph.with_subdivisions(30).to_outline()?;
     /// let mesh_2d = outline.triangulate()?;

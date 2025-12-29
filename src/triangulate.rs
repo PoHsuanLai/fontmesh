@@ -42,27 +42,27 @@ pub fn triangulate(outline: &Outline2D) -> Result<Mesh2D> {
     // Build the path from our outline
     let mut builder = lyon_tessellation::path::Path::builder();
 
-    for contour in &outline.contours {
-        if contour.is_empty() {
-            continue;
-        }
+    outline
+        .contours
+        .iter()
+        .filter(|contour| !contour.is_empty())
+        .for_each(|contour| {
+            // Start the contour
+            let first = contour.points[0].point;
+            builder.begin(lyon_tessellation::math::Point::new(first.x, first.y));
 
-        // Start the contour
-        let first = contour.points[0].point;
-        builder.begin(lyon_tessellation::math::Point::new(first.x, first.y));
+            // Add lines to the rest of the points
+            contour.points[1..].iter().for_each(|cp| {
+                builder.line_to(lyon_tessellation::math::Point::new(cp.point.x, cp.point.y));
+            });
 
-        // Add lines to the rest of the points
-        for cp in &contour.points[1..] {
-            builder.line_to(lyon_tessellation::math::Point::new(cp.point.x, cp.point.y));
-        }
-
-        // Close the contour if needed
-        if contour.closed {
-            builder.close();
-        } else {
-            builder.end(false);
-        }
-    }
+            // Close the contour if needed
+            if contour.closed {
+                builder.close();
+            } else {
+                builder.end(false);
+            }
+        });
 
     let path = builder.build();
 

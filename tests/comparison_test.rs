@@ -10,7 +10,7 @@
 
 use fontmesh::Font;
 
-const TEST_FONT: &[u8] = include_bytes!("../examples/test_font.ttf");
+const TEST_FONT: &[u8] = include_bytes!("../assets/test_font.ttf");
 
 #[test]
 fn test_2d_mesh_structure() {

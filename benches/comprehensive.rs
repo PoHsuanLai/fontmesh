@@ -3,8 +3,8 @@ use fontmesh::Font;
 
 // Comprehensive benchmark covering all important use cases
 fn bench_comprehensive(c: &mut Criterion) {
-    let font_data = include_bytes!("../examples/test_font.ttf");
-    let cursive_data = include_bytes!("../examples/test_font_cursive.ttf");
+    let font_data = include_bytes!("../assets/test_font.ttf");
+    let cursive_data = include_bytes!("../assets/test_font_cursive.ttf");
     let font = Font::from_bytes(font_data).unwrap();
     let cursive_font = Font::from_bytes(cursive_data).unwrap();
 

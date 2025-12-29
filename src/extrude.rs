@@ -48,36 +48,36 @@ pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh
 
     // 1. Create front face (z = half_depth)
     let normal_front = Vec3::new(0.0, 0.0, 1.0);
-    for vertex in &mesh_2d.vertices {
+    mesh_2d.vertices.iter().for_each(|vertex| {
         mesh_3d
             .vertices
             .push(Vec3::new(vertex.x, vertex.y, half_depth));
         mesh_3d.normals.push(normal_front);
-    }
+    });
 
     // Add front face triangles (reversed winding to convert CW input to CCW)
-    for chunk in mesh_2d.indices.chunks_exact(3) {
+    mesh_2d.indices.chunks_exact(3).for_each(|chunk| {
         mesh_3d.indices.push(chunk[0]);
         mesh_3d.indices.push(chunk[2]);
         mesh_3d.indices.push(chunk[1]);
-    }
+    });
 
     // 2. Create back face (z = -half_depth) with reversed winding
     let back_offset = mesh_3d.vertices.len() as u32;
     let normal_back = Vec3::new(0.0, 0.0, -1.0);
-    for vertex in &mesh_2d.vertices {
+    mesh_2d.vertices.iter().for_each(|vertex| {
         mesh_3d
             .vertices
             .push(Vec3::new(vertex.x, vertex.y, -half_depth));
         mesh_3d.normals.push(normal_back);
-    }
+    });
 
     // Add back face triangles (keep original CW winding so it faces back)
-    for chunk in mesh_2d.indices.chunks_exact(3) {
+    mesh_2d.indices.chunks_exact(3).for_each(|chunk| {
         mesh_3d.indices.push(back_offset + chunk[0]);
         mesh_3d.indices.push(back_offset + chunk[1]);
         mesh_3d.indices.push(back_offset + chunk[2]);
-    }
+    });
 
     // 3. Create side faces
     create_side_faces(&mut mesh_3d, outline, half_depth);
@@ -223,7 +223,7 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
 /// ```
 /// use fontmesh::{Font, compute_smooth_normals};
 ///
-/// let font = Font::from_bytes(include_bytes!("../examples/test_font.ttf"))?;
+/// let font = Font::from_bytes(include_bytes!("../assets/test_font.ttf"))?;
 /// let mut mesh = font.glyph_to_mesh_3d('A', 5.0)?;
 ///
 /// // Regenerate smooth normals (usually not needed)
