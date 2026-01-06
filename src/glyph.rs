@@ -1,12 +1,93 @@
 //! Glyph representation and outline extraction
 
 use crate::error::{FontMeshError, Result};
-use crate::types::{Contour, ContourPoint, Outline2D, Point2D};
+use crate::types::{Contour, ContourPoint, Mesh2D, Mesh3D, Outline2D, Point2D};
 use glam::Vec2;
 use ttf_parser::{Face, GlyphId, OutlineBuilder};
 
 /// Default quality for curve linearization (20 subdivisions per curve)
 const DEFAULT_QUALITY: u8 = 20;
+
+// ============================================================================
+// Pure Functions API - Stateless core functions
+// ============================================================================
+
+/// Convert a character to a 2D triangle mesh using a parsed font face
+///
+/// This is a pure function that takes a parsed `Face` and generates a mesh.
+/// This is the most flexible API - you control when to parse and cache the Face.
+///
+/// # Arguments
+/// * `face` - A parsed ttf-parser Face
+/// * `character` - The character to convert
+/// * `subdivisions` - Number of subdivisions per curve (higher = smoother, default 20)
+///
+/// # Example
+/// ```ignore
+/// use ttf_parser::Face;
+/// use fontmesh::char_to_mesh_2d;
+///
+/// let face = Face::parse(font_data, 0)?;
+/// let mesh = char_to_mesh_2d(&face, 'A', 20)?;
+/// ```
+pub fn char_to_mesh_2d(face: &Face, character: char, subdivisions: u8) -> Result<Mesh2D> {
+    let outline = extract_and_linearize_outline(face, character, subdivisions)?;
+    crate::triangulate::triangulate(&outline)
+}
+
+/// Convert a character to a 3D triangle mesh with extrusion using a parsed font face
+///
+/// This is a pure function that takes a parsed `Face` and generates a 3D mesh.
+/// This is the most flexible API - you control when to parse and cache the Face.
+///
+/// # Arguments
+/// * `face` - A parsed ttf-parser Face
+/// * `character` - The character to convert
+/// * `depth` - The extrusion depth
+/// * `subdivisions` - Number of subdivisions per curve (higher = smoother, default 20)
+///
+/// # Example
+/// ```ignore
+/// use ttf_parser::Face;
+/// use fontmesh::char_to_mesh_3d;
+///
+/// let face = Face::parse(font_data, 0)?;
+/// let mesh = char_to_mesh_3d(&face, 'A', 5.0, 20)?;
+/// ```
+pub fn char_to_mesh_3d(
+    face: &Face,
+    character: char,
+    depth: f32,
+    subdivisions: u8,
+) -> Result<Mesh3D> {
+    let outline = extract_and_linearize_outline(face, character, subdivisions)?;
+    let mesh_2d = crate::triangulate::triangulate(&outline)?;
+    crate::extrude::extrude(&mesh_2d, &outline, depth)
+}
+
+/// Extract and linearize a glyph outline from a parsed face
+///
+/// This is a helper function used by the other pure functions.
+/// You can use this directly if you want to work with outlines.
+fn extract_and_linearize_outline(
+    face: &Face,
+    character: char,
+    subdivisions: u8,
+) -> Result<Outline2D> {
+    let glyph_id = face
+        .glyph_index(character)
+        .ok_or(FontMeshError::GlyphNotFound(character))?;
+
+    let mut builder = OutlineExtractor::new(face.units_per_em());
+    face.outline_glyph(glyph_id, &mut builder)
+        .ok_or(FontMeshError::NoOutline)?;
+
+    if builder.outline.is_empty() {
+        return Err(FontMeshError::NoOutline);
+    }
+
+    crate::linearize::linearize_outline(builder.outline, subdivisions)
+}
 
 /// A glyph from a font
 pub struct Glyph<'a> {
@@ -66,6 +147,34 @@ impl<'a> GlyphMeshBuilder<'a> {
 }
 
 impl<'a> Glyph<'a> {
+    /// Create a new Glyph wrapper from a Face and a character
+    pub fn new(face: &'a Face<'a>, character: char) -> Result<Self> {
+        let glyph_id = face
+            .glyph_index(character)
+            .ok_or(FontMeshError::GlyphNotFound(character))?;
+
+        let advance = face
+            .glyph_hor_advance(glyph_id)
+            .map(|adv| adv as f32 / face.units_per_em() as f32)
+            .unwrap_or(0.0);
+
+        let bounds = face.glyph_bounding_box(glyph_id).map(|bb| {
+            let scale = 1.0 / face.units_per_em() as f32;
+            [
+                [bb.x_min as f32 * scale, bb.y_min as f32 * scale],
+                [bb.x_max as f32 * scale, bb.y_max as f32 * scale],
+            ]
+        });
+
+        Ok(Self {
+            character,
+            glyph_id,
+            face,
+            advance,
+            bounds,
+        })
+    }
+
     /// Get the character this glyph represents
     ///
     /// # Example

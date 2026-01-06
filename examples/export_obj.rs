@@ -1,12 +1,13 @@
 //! Export glyph to OBJ format
 
-use fontmesh::Font;
+use fontmesh::{char_to_mesh_3d, Face};
 use std::fs::File;
 use std::io::Write;
 
 fn main() {
-    let font = Font::from_bytes(include_bytes!("../assets/test_font.ttf")).unwrap();
-    let mesh = font.glyph_to_mesh_3d('A', 5.0).unwrap();
+    let font_data = include_bytes!("../assets/test_font.ttf");
+    let face = Face::parse(font_data, 0).unwrap();
+    let mesh = char_to_mesh_3d(&face, 'A', 5.0, 20).unwrap();
 
     let mut file = File::create("glyph_A.obj").unwrap();
     writeln!(

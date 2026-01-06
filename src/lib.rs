@@ -2,103 +2,110 @@
 //!
 //! A pure Rust library for converting TrueType font glyphs to 2D and 3D triangle meshes.
 //!
-//! This library provides a simple API for loading TrueType fonts and generating triangle
-//! meshes from individual glyphs. It supports both 2D (flat) and 3D (extruded) meshes.
+//! This library provides a **stateless, functional API** for generating triangle meshes from
+//! TrueType fonts. It uses pure functions that work directly with `ttf_parser::Face`,
+//! giving you full control over parsing and caching strategies.
 //!
 //! ## Features
 //!
 //! - **Pure Rust**: No C dependencies, fully cross-platform including WASM
+//! - **Stateless API**: Pure functions with no hidden state
 //! - **2D & 3D**: Generate both flat 2D meshes and extruded 3D meshes
 //! - **Quality Control**: Adjustable tessellation quality
 //! - **Efficient**: Uses lyon_tessellation for robust triangulation
-//! - **Fluent API**: Chain operations for ergonomic usage
+//! - **Flexible**: You control when to parse and cache fonts
 //!
 //! ## Basic Usage
 //!
 //! ```ignore
-//! use fontmesh::Font;
+//! use fontmesh::{Face, char_to_mesh_2d, char_to_mesh_3d};
 //!
-//! // Load font
-//! let font = Font::from_bytes(include_bytes!("path/to/font.ttf"))?;
+//! // Parse the font (this is fast - just table header parsing)
+//! let font_data = include_bytes!("path/to/font.ttf");
+//! let face = Face::parse(font_data, 0)?;
 //!
-//! // Generate a 2D mesh (uses default quality: 20 subdivisions)
-//! let mesh_2d = font.glyph_to_mesh_2d('A')?;
+//! // Generate a 2D mesh with 20 subdivisions per curve
+//! let mesh_2d = char_to_mesh_2d(&face, 'A', 20)?;
 //!
-//! // Generate a 3D mesh (uses default quality: 20 subdivisions)
-//! let mesh_3d = font.glyph_to_mesh_3d('A', 5.0)?;
+//! // Generate a 3D mesh with depth 5.0 and 20 subdivisions
+//! let mesh_3d = char_to_mesh_3d(&face, 'A', 5.0, 20)?;
 //! ```
 //!
-//! ## Fluent API
+//! ## Caching Strategy
 //!
-//! For more control, use the fluent API to chain operations:
+//! Because `Face::parse()` is extremely fast (it only reads the table directory), you should **not**
+//! attempt to cache the `Face` struct itself. Doing so is difficult because `Face` borrows the font data.
+//!
+//! Instead, simply store your font data (e.g., in a `Vec<u8>` or `Arc<Vec<u8>>`) and parse it on-demand
+//! whenever you need to generate a mesh.
 //!
 //! ```ignore
-//! use fontmesh::Font;
+//! use std::collections::HashMap;
+//! use std::sync::Arc;
+//! use fontmesh::Face;
 //!
-//! let font = Font::from_bytes(include_bytes!("font.ttf"))?;
+//! // Simple cache: just store the font data
+//! let mut font_cache: HashMap<String, Arc<Vec<u8>>> = HashMap::new();
+//! font_cache.insert("myfont".into(), Arc::new(font_data.to_vec()));
 //!
-//! // Fluent 2D mesh generation with default quality
-//! let mesh_2d = font.glyph_by_char('A')?.to_mesh_2d()?;
-//!
-//! // Fluent 3D mesh generation with custom quality (50 subdivisions)
-//! let mesh_3d = font.glyph_by_char('A')?.with_subdivisions(50).to_mesh_3d(5.0)?;
-//!
-//! // Access intermediate pipeline stages
-//! let outline = font.glyph_by_char('A')?.linearize()?;
-//! let mesh_2d = outline.triangulate()?;
-//! let mesh_3d = mesh_2d.extrude(&outline, 5.0)?;
+//! // Parse Face on-demand (fast!)
+//! let data = font_cache.get("myfont").unwrap();
+//! let face = Face::parse(data, 0)?;
+//! let mesh = fontmesh::char_to_mesh_3d(&face, 'A', 5.0, 20)?;
 //! ```
 //!
-//! ## Advanced Usage
+//! ## Font Metrics
 //!
-//! The mesh generation pipeline has discrete stages that you can access:
-//!
-//! 1. **Outline Extraction**: `Glyph::outline()` → Raw Bezier curves
-//! 2. **Linearization**: `linearize_outline()` → Straight line segments
-//! 3. **Triangulation**: `triangulate()` → 2D triangle mesh
-//! 4. **Extrusion**: `extrude()` → 3D mesh with depth
+//! Helper functions for common font metrics (normalized to 1.0 em):
 //!
 //! ```ignore
-//! use fontmesh::{Font, linearize_outline, triangulate, extrude};
+//! use fontmesh::{Face, ascender, descender, line_gap, glyph_advance};
 //!
-//! let font = Font::from_bytes(include_bytes!("font.ttf"))?;
-//! let glyph = font.glyph_by_char('A')?;
+//! let face = Face::parse(font_data, 0)?;
 //!
-//! // Get raw Bezier curves
-//! let outline = glyph.outline()?;
+//! let asc = ascender(&face);      // Font ascender
+//! let desc = descender(&face);    // Font descender
+//! let gap = line_gap(&face);      // Line gap
+//! let line_height = asc - desc + gap;
 //!
-//! // Convert curves to line segments (50 subdivisions per curve)
-//! let linearized = linearize_outline(outline, 50)?;
+//! // Get advance width for a character
+//! if let Some(width) = glyph_advance(&face, 'A') {
+//!     println!("'A' advance width: {}", width);
+//! }
+//! ```
 //!
-//! // Triangulate into 2D mesh
-//! let mesh_2d = triangulate(&linearized)?;
+//! ## Advanced: Pipeline Stages
 //!
-//! // Extrude to create multiple 3D variations
-//! let shallow = extrude(&mesh_2d, &linearized, 1.0)?;
-//! let deep = extrude(&mesh_2d, &linearized, 10.0)?;
+//! The mesh generation pipeline has discrete stages that you can access directly:
+//!
+//! 1. **Parse Font**: `Face::parse()` → Font tables
+//! 2. **Extract Outline**: (internal) → Raw Bezier curves
+//! 3. **Linearization**: (internal) → Straight line segments
+//! 4. **Triangulation**: `triangulate()` → 2D triangle mesh
+//! 5. **Extrusion**: `extrude()` → 3D mesh with depth
+//!
+//! ```ignore
+//! use fontmesh::{Face, triangulate, extrude, Outline2D};
+//!
+//! let face = Face::parse(font_data, 0)?;
+//!
+//! // Lower-level pipeline access (if you need it)
+//! // Most users should just use char_to_mesh_2d/3d
 //! ```
 //!
 //! ## Integration with Text Shaping
 //!
-//! For integration with text shaping libraries like `rustybuzz` or `cosmic-text`,
-//! use glyph IDs directly:
+//! Works seamlessly with text shaping libraries like `rustybuzz` or `cosmic-text`:
 //!
 //! ```ignore
-//! use fontmesh::{Font, GlyphId};
+//! use fontmesh::{Face, GlyphId, char_to_mesh_3d};
 //!
-//! let font = Font::from_bytes(include_bytes!("font.ttf"))?;
+//! let face = Face::parse(font_data, 0)?;
 //!
-//! // From text shaping (e.g., rustybuzz)
+//! // If you have glyph IDs from a shaping library, you can still use
+//! // the Face directly with ttf-parser APIs
 //! let glyph_id = GlyphId(42);
-//! let glyph = font.glyph_by_id(glyph_id, 'A');
-//! let mesh = glyph.with_subdivisions(50).to_mesh_3d(5.0)?;
-//!
-//! // Access glyph ID for caching
-//! let id = glyph.glyph_id();
-//!
-//! // Access ttf-parser for advanced features
-//! let face = font.face();
-//! let kerning = face.kerning_subtables();
+//! // ... then generate meshes per character as needed
 //! ```
 
 pub mod error;
@@ -111,60 +118,21 @@ pub mod types;
 
 // Re-export main types
 pub use error::{FontMeshError, Result};
-pub use font::Font;
-pub use glyph::{Glyph, GlyphMeshBuilder};
 pub use types::{Mesh2D, Mesh3D, Outline2D};
 
-// Re-export ttf-parser types for advanced usage
-pub use ttf_parser::GlyphId;
+// Re-export ttf-parser types for direct usage
+pub use ttf_parser::{Face, GlyphId};
+
+// Re-export core pure functions (stateless API)
+pub use glyph::{char_to_mesh_2d, char_to_mesh_3d, Glyph};
+
+// Re-export font utilities
+pub use font::{ascender, descender, glyph_advance, line_gap, parse_font};
 
 // Re-export pipeline functions for advanced usage
 pub use extrude::{compute_smooth_normals, extrude};
 pub use linearize::linearize_outline;
 pub use triangulate::triangulate;
-
-impl<'a> Font<'a> {
-    /// Convert a character glyph to a 2D triangle mesh
-    ///
-    /// Uses default quality (20 subdivisions per curve).
-    ///
-    /// # Arguments
-    /// * `character` - The character to convert
-    ///
-    /// # Returns
-    /// A 2D triangle mesh
-    ///
-    /// # Example
-    /// ```ignore
-    /// let mesh = font.glyph_to_mesh_2d('A')?;
-    /// println!("Generated {} vertices", mesh.vertices.len());
-    /// ```
-    pub fn glyph_to_mesh_2d(&self, character: char) -> Result<Mesh2D> {
-        let glyph = self.glyph_by_char(character)?;
-        glyph.to_mesh_2d()
-    }
-
-    /// Convert a character glyph to a 3D triangle mesh with extrusion
-    ///
-    /// Uses default quality (20 subdivisions per curve).
-    ///
-    /// # Arguments
-    /// * `character` - The character to convert
-    /// * `depth` - The extrusion depth
-    ///
-    /// # Returns
-    /// A 3D triangle mesh with normals
-    ///
-    /// # Example
-    /// ```ignore
-    /// let mesh = font.glyph_to_mesh_3d('A', 5.0)?;
-    /// println!("Generated {} triangles", mesh.triangle_count());
-    /// ```
-    pub fn glyph_to_mesh_3d(&self, character: char, depth: f32) -> Result<Mesh3D> {
-        let glyph = self.glyph_by_char(character)?;
-        glyph.to_mesh_3d(depth)
-    }
-}
 
 #[cfg(test)]
 mod tests {

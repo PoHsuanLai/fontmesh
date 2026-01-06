@@ -1,12 +1,13 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use fontmesh::Font;
+use fontmesh::glyph::Glyph;
+use fontmesh::{char_to_mesh_2d, char_to_mesh_3d, Face};
 
 // Comprehensive benchmark covering all important use cases
 fn bench_comprehensive(c: &mut Criterion) {
     let font_data = include_bytes!("../assets/test_font.ttf");
     let cursive_data = include_bytes!("../assets/test_font_cursive.ttf");
-    let font = Font::from_bytes(font_data).unwrap();
-    let cursive_font = Font::from_bytes(cursive_data).unwrap();
+    let face = Face::parse(font_data, 0).unwrap();
+    let cursive_face = Face::parse(cursive_data, 0).unwrap();
 
     let mut group = c.benchmark_group("fontmesh_comprehensive");
 
@@ -14,36 +15,35 @@ fn bench_comprehensive(c: &mut Criterion) {
 
     // Simple glyphs
     group.bench_function("simple_glyph_2d", |b| {
-        b.iter(|| font.glyph_to_mesh_2d(black_box('I')));
+        b.iter(|| char_to_mesh_2d(&face, black_box('I'), 20));
     });
 
     group.bench_function("simple_glyph_3d", |b| {
-        b.iter(|| font.glyph_to_mesh_3d(black_box('I'), black_box(5.0)));
+        b.iter(|| char_to_mesh_3d(&face, black_box('I'), black_box(5.0), 20));
     });
 
     // Medium complexity
     group.bench_function("medium_glyph_2d", |b| {
-        b.iter(|| font.glyph_to_mesh_2d(black_box('A')));
+        b.iter(|| char_to_mesh_2d(&face, black_box('A'), 20));
     });
 
     group.bench_function("medium_glyph_3d", |b| {
-        b.iter(|| font.glyph_to_mesh_3d(black_box('A'), black_box(5.0)));
+        b.iter(|| char_to_mesh_3d(&face, black_box('A'), black_box(5.0), 20));
     });
 
     // Complex glyphs
     group.bench_function("complex_glyph_2d", |b| {
-        b.iter(|| font.glyph_to_mesh_2d(black_box('@')));
+        b.iter(|| char_to_mesh_2d(&face, black_box('@'), 20));
     });
 
     group.bench_function("complex_glyph_3d", |b| {
-        b.iter(|| font.glyph_to_mesh_3d(black_box('@'), black_box(5.0)));
+        b.iter(|| char_to_mesh_3d(&face, black_box('@'), black_box(5.0), 20));
     });
 
     // Cursive font (very complex)
     group.bench_function("cursive_glyph_2d", |b| {
         b.iter(|| {
-            cursive_font
-                .glyph_by_char(black_box('A'))
+            Glyph::new(&cursive_face, black_box('A'))
                 .unwrap()
                 .with_subdivisions(black_box(50))
                 .to_mesh_2d()
@@ -52,8 +52,7 @@ fn bench_comprehensive(c: &mut Criterion) {
 
     group.bench_function("cursive_glyph_3d", |b| {
         b.iter(|| {
-            cursive_font
-                .glyph_by_char(black_box('A'))
+            Glyph::new(&cursive_face, black_box('A'))
                 .unwrap()
                 .with_subdivisions(black_box(50))
                 .to_mesh_3d(black_box(5.0))
@@ -68,7 +67,7 @@ fn bench_comprehensive(c: &mut Criterion) {
             &subdivisions,
             |b, &subdivisions| {
                 b.iter(|| {
-                    font.glyph_by_char(black_box('@'))
+                    Glyph::new(&face, black_box('@'))
                         .unwrap()
                         .with_subdivisions(black_box(subdivisions))
                         .to_mesh_3d(black_box(5.0))
@@ -83,7 +82,7 @@ fn bench_comprehensive(c: &mut Criterion) {
         let word = "HELLO";
         b.iter(|| {
             for ch in word.chars() {
-                let _ = font.glyph_to_mesh_2d(black_box(ch));
+                let _ = char_to_mesh_2d(&face, black_box(ch), 20);
             }
         });
     });
@@ -92,7 +91,7 @@ fn bench_comprehensive(c: &mut Criterion) {
         let word = "HELLO";
         b.iter(|| {
             for ch in word.chars() {
-                let _ = font.glyph_to_mesh_3d(black_box(ch), black_box(5.0));
+                let _ = char_to_mesh_3d(&face, black_box(ch), black_box(5.0), 20);
             }
         });
     });
@@ -100,7 +99,7 @@ fn bench_comprehensive(c: &mut Criterion) {
     group.bench_function("batch_alphabet_2d", |b| {
         b.iter(|| {
             for ch in 'A'..='Z' {
-                let _ = font.glyph_to_mesh_2d(black_box(ch));
+                let _ = char_to_mesh_2d(&face, black_box(ch), 20);
             }
         });
     });
@@ -108,20 +107,19 @@ fn bench_comprehensive(c: &mut Criterion) {
     // === Pipeline Stages ===
 
     group.bench_function("stage_outline", |b| {
-        b.iter(|| font.glyph_by_char(black_box('@')).unwrap().outline());
+        b.iter(|| Glyph::new(&face, black_box('@')).unwrap().outline());
     });
 
     group.bench_function("stage_linearize", |b| {
         b.iter(|| {
-            font.glyph_by_char(black_box('@'))
+            Glyph::new(&face, black_box('@'))
                 .unwrap()
                 .with_subdivisions(black_box(20))
                 .to_outline()
         });
     });
 
-    let outline = font
-        .glyph_by_char('@')
+    let outline = Glyph::new(&face, '@')
         .unwrap()
         .with_subdivisions(20)
         .to_outline()
