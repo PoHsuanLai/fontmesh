@@ -8,18 +8,18 @@
 //! - Normal vector validity (normalized)
 //! - Mesh topology (closed, manifold)
 
-use fontmesh::Font;
+use fontmesh::glyph::Glyph;
+use fontmesh::{char_to_mesh_2d, char_to_mesh_3d, Face};
 
 const TEST_FONT: &[u8] = include_bytes!("../assets/test_font.ttf");
 
 #[test]
 fn test_2d_mesh_structure() {
-    let font = Font::from_bytes(TEST_FONT).expect("Failed to load font");
+    let font = Face::parse(TEST_FONT, 0).expect("Failed to load font");
 
     // Test multiple characters
     for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".chars() {
-        let mesh = font
-            .glyph_to_mesh_2d(c)
+        let mesh = char_to_mesh_2d(&font, c, 20)
             .unwrap_or_else(|_| panic!("Failed to generate mesh for '{}'", c));
 
         // Basic structure validation
@@ -29,7 +29,7 @@ fn test_2d_mesh_structure() {
             c
         );
         assert!(
-            mesh.indices.len().is_multiple_of(3),
+            mesh.indices.len() % 3 == 0,
             "Indices for '{}' should be multiple of 3",
             c
         );
@@ -63,13 +63,12 @@ fn test_2d_mesh_structure() {
 
 #[test]
 fn test_3d_mesh_structure() {
-    let font = Font::from_bytes(TEST_FONT).expect("Failed to load font");
+    let font = Face::parse(TEST_FONT, 0).expect("Failed to load font");
 
     // Test multiple characters with different depths
     for c in "ABCXYZ123".chars() {
         for depth in [1.0, 5.0, 10.0] {
-            let mesh = font
-                .glyph_to_mesh_3d(c, depth)
+            let mesh = char_to_mesh_3d(&font, c, depth, 20)
                 .unwrap_or_else(|_| panic!("Failed to generate 3D mesh for '{}'", c));
 
             // Basic structure validation
@@ -85,7 +84,7 @@ fn test_3d_mesh_structure() {
                 c
             );
             assert!(
-                mesh.indices.len().is_multiple_of(3),
+                mesh.indices.len() % 3 == 0,
                 "Indices for '{}' should be multiple of 3",
                 c
             );
@@ -149,22 +148,19 @@ fn test_3d_mesh_structure() {
 
 #[test]
 fn test_quality_levels() {
-    let font = Font::from_bytes(TEST_FONT).expect("Failed to load font");
+    let font = Face::parse(TEST_FONT, 0).expect("Failed to load font");
 
-    let low = font
-        .glyph_by_char('S')
+    let low = Glyph::new(&font, 'S')
         .unwrap()
         .with_subdivisions(10)
         .to_mesh_2d()
         .unwrap();
-    let normal = font
-        .glyph_by_char('S')
+    let normal = Glyph::new(&font, 'S')
         .unwrap()
         .with_subdivisions(20)
         .to_mesh_2d()
         .unwrap();
-    let high = font
-        .glyph_by_char('S')
+    let high = Glyph::new(&font, 'S')
         .unwrap()
         .with_subdivisions(50)
         .to_mesh_2d()
@@ -201,8 +197,8 @@ fn test_quality_levels() {
 
 #[test]
 fn test_direct_access() {
-    let font = Font::from_bytes(TEST_FONT).expect("Failed to load font");
-    let mesh = font.glyph_to_mesh_3d('A', 5.0).unwrap();
+    let font = Face::parse(TEST_FONT, 0).expect("Failed to load font");
+    let mesh = char_to_mesh_3d(&font, 'A', 5.0, 20).unwrap();
 
     // Test direct vertex access
     assert!(mesh.vertices.len() > 0, "Mesh should have vertices");
@@ -254,7 +250,7 @@ fn test_direct_access() {
 
 #[test]
 fn test_mesh_topology() {
-    let font = Font::from_bytes(TEST_FONT).expect("Failed to load font");
+    let font = Face::parse(TEST_FONT, 0).expect("Failed to load font");
 
     // Test characters with different topologies
     let test_chars = vec![
@@ -266,7 +262,7 @@ fn test_mesh_topology() {
     ];
 
     for (c, description) in test_chars {
-        let mesh = font.glyph_to_mesh_2d(c).unwrap();
+        let mesh = char_to_mesh_2d(&font, c, 20).unwrap();
 
         println!(
             "Character '{}' ({}): {} vertices, {} triangles",
@@ -297,13 +293,13 @@ fn test_mesh_topology() {
 
 #[test]
 fn test_special_characters() {
-    let font = Font::from_bytes(TEST_FONT).expect("Failed to load font");
+    let font = Face::parse(TEST_FONT, 0).expect("Failed to load font");
 
     // Test punctuation and symbols
     let special = vec!['.', ',', '!', '?', '@', '#', '$', '%', '&', '*'];
 
     for c in special {
-        match font.glyph_to_mesh_2d(c) {
+        match char_to_mesh_2d(&font, c, 20) {
             Ok(mesh) => {
                 assert!(
                     mesh.vertices.len() > 0,
@@ -327,13 +323,13 @@ fn test_special_characters() {
 
 #[test]
 fn test_depth_consistency() {
-    let font = Font::from_bytes(TEST_FONT).expect("Failed to load font");
+    let font = Face::parse(TEST_FONT, 0).expect("Failed to load font");
 
     let depths = vec![0.5, 1.0, 2.0, 5.0, 10.0];
     let mut vertex_counts = Vec::new();
 
     for &depth in &depths {
-        let mesh = font.glyph_to_mesh_3d('M', depth).unwrap();
+        let mesh = char_to_mesh_3d(&font, 'M', depth, 20).unwrap();
         vertex_counts.push(mesh.vertices.len());
 
         // Check that all vertices respect the depth
@@ -368,13 +364,13 @@ fn test_depth_consistency() {
 
 #[test]
 fn test_error_handling() {
-    let font = Font::from_bytes(TEST_FONT).expect("Failed to load font");
+    let font = Face::parse(TEST_FONT, 0).expect("Failed to load font");
 
     // Test character that might not exist in the font
     let rare_chars = vec!['\u{1F600}', '\u{2603}', '\u{FFFF}'];
 
     for c in rare_chars {
-        match font.glyph_to_mesh_2d(c) {
+        match char_to_mesh_2d(&font, c, 20) {
             Ok(_) => {
                 println!("Character U+{:04X} is available", c as u32);
             }

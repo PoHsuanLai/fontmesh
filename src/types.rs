@@ -94,17 +94,13 @@ impl Default for Outline2D {
 }
 
 impl Outline2D {
-    /// Triangulate this outline into a 2D mesh (fluent API)
-    ///
-    /// # Returns
-    /// Convert this outline to a 2D triangle mesh
-    ///
-    /// # Example
+    /// Example
     /// ```
-    /// use fontmesh::Font;
+    /// use fontmesh::{Face, glyph::Glyph};
     ///
-    /// let font = Font::from_bytes(include_bytes!("../assets/test_font.ttf"))?;
-    /// let glyph = font.glyph_by_char('A')?;
+    /// let font_data = include_bytes!("../assets/test_font.ttf");
+    /// let face = Face::parse(font_data, 0)?;
+    /// let glyph = Glyph::new(&face, 'A')?;
     /// let outline = glyph.with_subdivisions(20).to_outline()?;
     /// let mesh = outline.triangulate()?;
     /// # Ok::<(), fontmesh::FontMeshError>(())
@@ -122,12 +118,13 @@ impl Outline2D {
     /// # Returns
     /// A 3D triangle mesh with normals
     ///
-    /// # Example
+    /// Example
     /// ```
-    /// use fontmesh::Font;
+    /// use fontmesh::{Face, glyph::Glyph};
     ///
-    /// let font = Font::from_bytes(include_bytes!("../assets/test_font.ttf"))?;
-    /// let glyph = font.glyph_by_char('A')?;
+    /// let font_data = include_bytes!("../assets/test_font.ttf");
+    /// let face = Face::parse(font_data, 0)?;
+    /// let glyph = Glyph::new(&face, 'A')?;
     /// let outline = glyph.with_subdivisions(30).to_outline()?;
     /// let mesh = outline.to_mesh_3d(5.0)?;
     /// # Ok::<(), fontmesh::FontMeshError>(())
@@ -177,12 +174,13 @@ impl Mesh2D {
     /// # Returns
     /// A 3D triangle mesh with normals
     ///
-    /// # Example
+    /// Example
     /// ```
-    /// use fontmesh::Font;
+    /// use fontmesh::{Face, glyph::Glyph};
     ///
-    /// let font = Font::from_bytes(include_bytes!("../assets/test_font.ttf"))?;
-    /// let glyph = font.glyph_by_char('A')?;
+    /// let font_data = include_bytes!("../assets/test_font.ttf");
+    /// let face = Face::parse(font_data, 0)?;
+    /// let glyph = Glyph::new(&face, 'A')?;
     /// let outline = glyph.with_subdivisions(30).to_outline()?;
     /// let mesh_2d = outline.triangulate()?;
     /// let mesh_3d = mesh_2d.extrude(&outline, 5.0)?;

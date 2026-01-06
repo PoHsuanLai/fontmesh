@@ -47,5 +47,11 @@ impl fmt::Display for FontMeshError {
 
 impl std::error::Error for FontMeshError {}
 
+impl From<ttf_parser::FaceParsingError> for FontMeshError {
+    fn from(err: ttf_parser::FaceParsingError) -> Self {
+        Self::ParseError(format!("ttf_parser error: {}", err))
+    }
+}
+
 /// Result type for fontmesh operations
 pub type Result<T> = std::result::Result<T, FontMeshError>;
