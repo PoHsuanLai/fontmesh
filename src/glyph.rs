@@ -31,6 +31,9 @@ const DEFAULT_QUALITY: u8 = 20;
 /// let mesh = char_to_mesh_2d(&face, 'A', 20)?;
 /// ```
 pub fn char_to_mesh_2d(face: &Face, character: char, subdivisions: u8) -> Result<Mesh2D> {
+    if subdivisions == 0 {
+        return Err(FontMeshError::InvalidQuality(subdivisions));
+    }
     let outline = extract_and_linearize_outline(face, character, subdivisions)?;
     crate::triangulate::triangulate(&outline)
 }
@@ -60,6 +63,14 @@ pub fn char_to_mesh_3d(
     depth: f32,
     subdivisions: u8,
 ) -> Result<Mesh3D> {
+    if subdivisions == 0 {
+        return Err(FontMeshError::InvalidQuality(subdivisions));
+    }
+    if !depth.is_finite() {
+        return Err(FontMeshError::ExtrusionFailed(
+            "depth must be a finite value".to_string(),
+        ));
+    }
     let outline = extract_and_linearize_outline(face, character, subdivisions)?;
     let mesh_2d = crate::triangulate::triangulate(&outline)?;
     crate::extrude::extrude(&mesh_2d, &outline, depth)
@@ -140,6 +151,11 @@ impl<'a> GlyphMeshBuilder<'a> {
 
     /// Convert to a 3D triangle mesh with extrusion
     pub fn to_mesh_3d(self, depth: f32) -> Result<crate::types::Mesh3D> {
+        if !depth.is_finite() {
+            return Err(FontMeshError::ExtrusionFailed(
+                "depth must be a finite value".to_string(),
+            ));
+        }
         let outline = self.glyph.linearize_with(self.subdivisions)?;
         let mesh_2d = crate::triangulate::triangulate(&outline)?;
         crate::extrude::extrude(&mesh_2d, &outline, depth)
@@ -324,6 +340,11 @@ impl<'a> Glyph<'a> {
     /// ```
     #[inline]
     pub fn to_mesh_3d(&self, depth: f32) -> Result<crate::types::Mesh3D> {
+        if !depth.is_finite() {
+            return Err(FontMeshError::ExtrusionFailed(
+                "depth must be a finite value".to_string(),
+            ));
+        }
         let outline = self.linearize()?;
         let mesh_2d = crate::triangulate::triangulate(&outline)?;
         crate::extrude::extrude(&mesh_2d, &outline, depth)

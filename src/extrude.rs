@@ -333,7 +333,7 @@ mod tests {
         let mesh_3d = extrude(&mesh_2d, &outline, 1.0).expect("Extrusion should succeed");
 
         // Should have front face, back face, and 4 side faces
-        assert!(mesh_3d.vertices.len() > 0);
+        assert!(!mesh_3d.vertices.is_empty());
         assert!(mesh_3d.triangle_count() > 0);
         assert_eq!(mesh_3d.vertices.len(), mesh_3d.normals.len());
     }

@@ -24,12 +24,12 @@ fn test_2d_mesh_structure() {
 
         // Basic structure validation
         assert!(
-            mesh.vertices.len() > 0,
+            !mesh.vertices.is_empty(),
             "Mesh for '{}' should have vertices",
             c
         );
         assert!(
-            mesh.indices.len() % 3 == 0,
+            mesh.indices.len().is_multiple_of(3),
             "Indices for '{}' should be multiple of 3",
             c
         );
@@ -73,7 +73,7 @@ fn test_3d_mesh_structure() {
 
             // Basic structure validation
             assert!(
-                mesh.vertices.len() > 0,
+                !mesh.vertices.is_empty(),
                 "3D Mesh for '{}' should have vertices",
                 c
             );
@@ -84,7 +84,7 @@ fn test_3d_mesh_structure() {
                 c
             );
             assert!(
-                mesh.indices.len() % 3 == 0,
+                mesh.indices.len().is_multiple_of(3),
                 "Indices for '{}' should be multiple of 3",
                 c
             );
@@ -201,7 +201,7 @@ fn test_direct_access() {
     let mesh = char_to_mesh_3d(&font, 'A', 5.0, 20).unwrap();
 
     // Test direct vertex access
-    assert!(mesh.vertices.len() > 0, "Mesh should have vertices");
+    assert!(!mesh.vertices.is_empty(), "Mesh should have vertices");
 
     // Test direct normal access
     assert_eq!(
@@ -302,7 +302,7 @@ fn test_special_characters() {
         match char_to_mesh_2d(&font, c, 20) {
             Ok(mesh) => {
                 assert!(
-                    mesh.vertices.len() > 0,
+                    !mesh.vertices.is_empty(),
                     "Special char '{}' should have vertices",
                     c
                 );
