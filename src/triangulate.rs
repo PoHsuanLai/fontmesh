@@ -131,5 +131,4 @@ mod tests {
         assert!(mesh.vertices.len() >= 4);
         assert!(mesh.triangle_count() >= 2);
     }
-
 }

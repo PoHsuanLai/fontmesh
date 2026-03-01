@@ -123,9 +123,9 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
 
             let base_idx = mesh_3d.vertices.len() as u32;
 
-            mesh_3d.vertices.push(Vec3::new(p0.x, p0.y,  half_depth)); // 0: p0 front
+            mesh_3d.vertices.push(Vec3::new(p0.x, p0.y, half_depth)); // 0: p0 front
             mesh_3d.normals.push(face_normal);
-            mesh_3d.vertices.push(Vec3::new(p1.x, p1.y,  half_depth)); // 1: p1 front
+            mesh_3d.vertices.push(Vec3::new(p1.x, p1.y, half_depth)); // 1: p1 front
             mesh_3d.normals.push(face_normal);
             mesh_3d.vertices.push(Vec3::new(p1.x, p1.y, -half_depth)); // 2: p1 back
             mesh_3d.normals.push(face_normal);
@@ -134,8 +134,12 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
 
             // Reversed winding: CCW from the direction the right perp points.
             mesh_3d.indices.extend_from_slice(&[
-                base_idx, base_idx+2, base_idx+1,
-                base_idx, base_idx+3, base_idx+2,
+                base_idx,
+                base_idx + 2,
+                base_idx + 1,
+                base_idx,
+                base_idx + 3,
+                base_idx + 2,
             ]);
         }
     }
@@ -272,5 +276,4 @@ mod tests {
         assert!(mesh_3d.triangle_count() > 0);
         assert_eq!(mesh_3d.vertices.len(), mesh_3d.normals.len());
     }
-
 }
