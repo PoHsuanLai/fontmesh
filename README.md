@@ -48,7 +48,6 @@ let mesh = char_to_mesh_3d(&face, 'A', 5.0, 20)?;
 
 ```bash
 cargo run --example basic
-cargo run --example export_obj
 cargo run --example serde --features serde
 ```
 
