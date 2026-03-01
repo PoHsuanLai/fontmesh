@@ -116,9 +116,9 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
                 continue;
             }
 
-            // Calculate current edge normal (fast path - no sqrt needed for direction)
+            // Calculate current edge normal (right perp = outward from glyph surface)
             let edge_dir = edge_vec * (1.0 / edge_len_sq.sqrt());
-            let current_normal = Vec3::new(-edge_dir.y, edge_dir.x, 0.0);
+            let current_normal = Vec3::new(edge_dir.y, -edge_dir.x, 0.0);
 
             // Calculate smooth normals by averaging with adjacent edges
             let prev_idx = if i == 0 {
@@ -141,7 +141,7 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
 
                 if prev_len_sq > 1e-10 {
                     let prev_dir = prev_edge * (1.0 / prev_len_sq.sqrt());
-                    let prev_normal = Vec3::new(-prev_dir.y, prev_dir.x, 0.0);
+                    let prev_normal = Vec3::new(prev_dir.y, -prev_dir.x, 0.0);
                     ((prev_normal + current_normal) * 0.5).normalize_or_zero()
                 } else {
                     current_normal
@@ -166,7 +166,7 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
 
                 if next_len_sq > 1e-10 {
                     let next_dir = next_edge * (1.0 / next_len_sq.sqrt());
-                    let next_normal = Vec3::new(-next_dir.y, next_dir.x, 0.0);
+                    let next_normal = Vec3::new(next_dir.y, -next_dir.x, 0.0);
                     ((current_normal + next_normal) * 0.5).normalize_or_zero()
                 } else {
                     current_normal
@@ -192,14 +192,14 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
             mesh_3d.vertices.push(Vec3::new(p0.x, p0.y, -half_depth));
             mesh_3d.normals.push(normal_p0);
 
-            // Two triangles for the quad
+            // Two triangles for the quad — CCW from outward normal direction
             let indices = [
                 base_idx,
+                base_idx + 2,
                 base_idx + 1,
-                base_idx + 2,
                 base_idx,
-                base_idx + 2,
                 base_idx + 3,
+                base_idx + 2,
             ];
             mesh_3d.indices.extend_from_slice(&indices);
         }
