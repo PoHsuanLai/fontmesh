@@ -158,15 +158,14 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
 /// # Arguments
 /// * `mesh` - The mesh to recompute normals for (modified in-place)
 ///
-/// Example
-/// ```
-/// use fontmesh::{Face, char_to_mesh_3d, compute_smooth_normals};
+/// ```ignore
+/// use fontmesh::{parse_font, glyph_id, glyph_to_mesh_3d, compute_smooth_normals};
 ///
 /// let font_data = include_bytes!("../assets/test_font.ttf");
-/// let face = Face::parse(font_data, 0)?;
-/// let mut mesh = char_to_mesh_3d(&face, 'A', 5.0, 20)?;
+/// let font = parse_font(font_data)?;
+/// let gid = glyph_id(&font, 'A').unwrap();
+/// let mut mesh = glyph_to_mesh_3d(&font, gid, 5.0, 20)?;
 ///
-/// // Regenerate smooth normals (usually not needed)
 /// compute_smooth_normals(&mut mesh);
 /// # Ok::<(), fontmesh::FontMeshError>(())
 /// ```
