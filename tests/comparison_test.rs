@@ -62,8 +62,16 @@ fn test_2d_mesh_structure() {
         }
 
         for vertex in &mesh.vertices {
-            assert!(vertex.x.is_finite(), "Vertex x should be finite for '{}'", c);
-            assert!(vertex.y.is_finite(), "Vertex y should be finite for '{}'", c);
+            assert!(
+                vertex.x.is_finite(),
+                "Vertex x should be finite for '{}'",
+                c
+            );
+            assert!(
+                vertex.y.is_finite(),
+                "Vertex y should be finite for '{}'",
+                c
+            );
         }
     }
 }
@@ -114,9 +122,21 @@ fn test_3d_mesh_structure() {
             }
 
             for vertex in &mesh.vertices {
-                assert!(vertex.x.is_finite(), "Vertex x should be finite for '{}'", c);
-                assert!(vertex.y.is_finite(), "Vertex y should be finite for '{}'", c);
-                assert!(vertex.z.is_finite(), "Vertex z should be finite for '{}'", c);
+                assert!(
+                    vertex.x.is_finite(),
+                    "Vertex x should be finite for '{}'",
+                    c
+                );
+                assert!(
+                    vertex.y.is_finite(),
+                    "Vertex y should be finite for '{}'",
+                    c
+                );
+                assert!(
+                    vertex.z.is_finite(),
+                    "Vertex z should be finite for '{}'",
+                    c
+                );
 
                 let half_depth = depth / 2.0;
                 assert!(
@@ -137,9 +157,18 @@ fn test_quality_levels() {
     let font = font();
     let s = gid(&font, 'S');
 
-    let low = GlyphMeshBuilder::new(&font, s).with_subdivisions(10).to_mesh_2d().unwrap();
-    let normal = GlyphMeshBuilder::new(&font, s).with_subdivisions(20).to_mesh_2d().unwrap();
-    let high = GlyphMeshBuilder::new(&font, s).with_subdivisions(50).to_mesh_2d().unwrap();
+    let low = GlyphMeshBuilder::new(&font, s)
+        .with_subdivisions(10)
+        .to_mesh_2d()
+        .unwrap();
+    let normal = GlyphMeshBuilder::new(&font, s)
+        .with_subdivisions(20)
+        .to_mesh_2d()
+        .unwrap();
+    let high = GlyphMeshBuilder::new(&font, s)
+        .with_subdivisions(50)
+        .to_mesh_2d()
+        .unwrap();
 
     assert!(
         low.vertices.len() <= normal.vertices.len(),
@@ -235,8 +264,16 @@ fn test_mesh_topology() {
             c
         );
 
-        assert!(mesh.vertices.len() >= 3, "Should have at least 3 vertices for '{}'", c);
-        assert!(mesh.triangle_count() >= 1, "Should have at least 1 face for '{}'", c);
+        assert!(
+            mesh.vertices.len() >= 3,
+            "Should have at least 3 vertices for '{}'",
+            c
+        );
+        assert!(
+            mesh.triangle_count() >= 1,
+            "Should have at least 1 face for '{}'",
+            c
+        );
     }
 }
 

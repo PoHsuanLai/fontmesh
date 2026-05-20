@@ -66,14 +66,18 @@ fn extract_outline(font: &FontRef, glyph_id: GlyphId) -> Result<Outline2D> {
             glyph_id.to_u32()
         )))?;
 
-    let units_per_em = font.metrics(Size::unscaled(), LocationRef::default()).units_per_em;
+    let units_per_em = font
+        .metrics(Size::unscaled(), LocationRef::default())
+        .units_per_em;
     let mut pen = OutlineExtractor::new(units_per_em);
     glyph
         .draw(
             DrawSettings::unhinted(Size::unscaled(), LocationRef::default()),
             &mut pen,
         )
-        .map_err(|e| FontMeshError::OutlineExtractionFailed(format!("skrifa draw failed: {e:?}")))?;
+        .map_err(|e| {
+            FontMeshError::OutlineExtractionFailed(format!("skrifa draw failed: {e:?}"))
+        })?;
 
     pen.finish_contour();
 
