@@ -85,6 +85,13 @@ pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh
 }
 
 /// Create side faces by connecting outline edges with outward-facing normals.
+///
+/// The "outward" direction depends on each contour's winding. Fonts don't
+/// pin winding: TrueType ships outer contours CW and holes CCW (in math
+/// Y-up coordinates), while CFF/PostScript ships outer contours CCW and
+/// holes CW. We detect per contour by signed area and flip the perpendicular
+/// and triangle winding accordingly so the produced sides face outward in
+/// both cases.
 #[inline]
 fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32) {
     for contour in &outline.contours {
@@ -94,6 +101,22 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
         }
 
         let points = &contour.points;
+
+        // Signed area in math (Y-up) coordinates: positive => CCW, negative => CW.
+        // When walking the contour in its native direction the interior sits
+        // to one side; the *opposite* perpendicular of each edge points
+        // outward. For a CCW outer contour the interior is on the left, so
+        // the right perpendicular points outward. For a CW outer contour
+        // (TrueType convention) the interior is on the right, so the left
+        // perpendicular points outward.
+        let signed_area_x2: f32 = (0..num_points)
+            .map(|i| {
+                let p0 = points[i].point;
+                let p1 = points[(i + 1) % num_points].point;
+                p0.x * p1.y - p1.x * p0.y
+            })
+            .sum();
+        let ccw = signed_area_x2 > 0.0;
 
         for i in 0..num_points {
             let next = if contour.closed {
@@ -116,10 +139,12 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
 
             let edge_dir = edge_vec * (1.0 / edge_len_sq.sqrt());
 
-            // Right perpendicular of the edge direction points outward from the
-            // glyph surface (away from the letter body) for all contour types.
-            // Winding [0,2,1],[0,3,2] is CCW when viewed from that outward direction.
-            let face_normal = Vec3::new(edge_dir.y, -edge_dir.x, 0.0); // right perp = outward
+            // Pick the outward perpendicular based on winding.
+            let face_normal = if ccw {
+                Vec3::new(edge_dir.y, -edge_dir.x, 0.0) // right perp = outward for CCW
+            } else {
+                Vec3::new(-edge_dir.y, edge_dir.x, 0.0) // left perp = outward for CW
+            };
 
             let base_idx = mesh_3d.vertices.len() as u32;
 
@@ -132,15 +157,32 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
             mesh_3d.vertices.push(Vec3::new(p0.x, p0.y, -half_depth)); // 3: p0 back
             mesh_3d.normals.push(face_normal);
 
-            // Reversed winding: CCW from the direction the right perp points.
-            mesh_3d.indices.extend_from_slice(&[
-                base_idx,
-                base_idx + 2,
-                base_idx + 1,
-                base_idx,
-                base_idx + 3,
-                base_idx + 2,
-            ]);
+            // Triangle winding must be CCW when viewed from the outward
+            // direction so the geometric normal matches `face_normal` and
+            // back-face culling keeps the triangle visible from outside.
+            // For CCW contours (right perp outward), reversed winding
+            // [0,2,1],[0,3,2] orients the quad CCW from outside. For CW
+            // contours (left perp outward), the natural winding [0,1,2],
+            // [0,2,3] is CCW from outside.
+            if ccw {
+                mesh_3d.indices.extend_from_slice(&[
+                    base_idx,
+                    base_idx + 2,
+                    base_idx + 1,
+                    base_idx,
+                    base_idx + 3,
+                    base_idx + 2,
+                ]);
+            } else {
+                mesh_3d.indices.extend_from_slice(&[
+                    base_idx,
+                    base_idx + 1,
+                    base_idx + 2,
+                    base_idx,
+                    base_idx + 2,
+                    base_idx + 3,
+                ]);
+            }
         }
     }
 }
