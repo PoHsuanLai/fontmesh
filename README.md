@@ -5,7 +5,9 @@
 [![Documentation](https://docs.rs/fontmesh/badge.svg)](https://docs.rs/fontmesh)
 [![License: MIT or Apache-2.0](https://img.shields.io/badge/License-MIT%20or%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
-Library for converting TrueType font glyphs to 2D and 3D triangle meshes. A faster, pure Rust alternative to [ttf2mesh](https://github.com/blaind/ttf2mesh-rs).
+Library for converting font glyphs to 2D and 3D triangle meshes. A faster, pure Rust alternative to [ttf2mesh](https://github.com/blaind/ttf2mesh-rs).
+
+Font parsing is handled by [`skrifa`](https://crates.io/crates/skrifa), so both TrueType (`glyf`) and OpenType with CFF/PostScript outlines are supported, and the same parsed-font handle plugs straight into shaping libraries like `cosmic-text`.
 
 <p align="center"><img src="images/fontmesh_logo.png" width="70%" alt="3D Text" /></p>
 
@@ -17,31 +19,31 @@ Library for converting TrueType font glyphs to 2D and 3D triangle meshes. A fast
 ## Quick Start
 
 ```rust
-use fontmesh::{Face, char_to_mesh_2d, char_to_mesh_3d};
+use fontmesh::{parse_font, glyph_id, glyph_to_mesh_2d, glyph_to_mesh_3d};
 
 let font_data = include_bytes!("font.ttf");
-let face = Face::parse(font_data, 0)?;
+let font = parse_font(font_data)?;
+let gid = glyph_id(&font, 'A').expect("font contains 'A'");
 
 // 2D mesh with 20 subdivisions per curve
-let mesh_2d = char_to_mesh_2d(&face, 'A', 20)?;
+let mesh_2d = glyph_to_mesh_2d(&font, gid, 20)?;
 
-// 3D mesh with depth 5.0 and 50 subdivisions
-let mesh_3d = char_to_mesh_3d(&face, 'A', 5.0, 50)?;
+// 3D mesh with depth 0.1 em and 50 subdivisions
+let mesh_3d = glyph_to_mesh_3d(&font, gid, 0.1, 50)?;
 ```
 
-## Caching
+Output coordinates are normalised to **1.0 em** — `depth = 0.1` is 10 % of the font's em square.
+
+## Working with a shaper
+
+If you already have a `skrifa::FontRef` or `skrifa::GlyphId` from a shaper (cosmic-text, harfbuzz, …), pass it straight in — no extra parse is needed:
+
 ```rust
-use std::collections::HashMap;
-use std::sync::Arc;
+use fontmesh::{FontRef, GlyphId, glyph_to_mesh_3d};
 
-// Cache just the font data
-let mut cache: HashMap<String, Arc<Vec<u8>>> = HashMap::new();
-cache.insert("myfont".into(), Arc::new(font_data.to_vec()));
-
-// Parse Face when needed (cheap!)
-let data = cache.get("myfont").unwrap();
-let face = Face::parse(data, 0)?;
-let mesh = char_to_mesh_3d(&face, 'A', 5.0, 20)?;
+let font: FontRef = /* from your shaper */;
+let gid: GlyphId = /* from your shaper */;
+let mesh = glyph_to_mesh_3d(&font, gid, 0.1, 20)?;
 ```
 
 ## Examples

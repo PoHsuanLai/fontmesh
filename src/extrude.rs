@@ -23,7 +23,6 @@ use rustc_hash::FxHashMap;
 pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh3D> {
     let half_depth = depth / 2.0;
 
-    // Pre-calculate total size to avoid reallocations
     let outline_edge_count: usize = outline
         .contours
         .iter()
@@ -45,7 +44,8 @@ pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh
         indices: Vec::with_capacity(total_indices),
     };
 
-    // 1. Create front face (z = half_depth)
+    // Front face: reverse the input winding so the front normal (+z) is CCW
+    // from the viewer and back-face culling keeps it visible.
     let normal_front = Vec3::new(0.0, 0.0, 1.0);
     mesh_2d.vertices.iter().for_each(|vertex| {
         mesh_3d
@@ -53,15 +53,13 @@ pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh
             .push(Vec3::new(vertex.x, vertex.y, half_depth));
         mesh_3d.normals.push(normal_front);
     });
-
-    // Add front face triangles (reversed winding to convert CW input to CCW)
     mesh_2d.indices.chunks_exact(3).for_each(|chunk| {
         mesh_3d.indices.push(chunk[0]);
         mesh_3d.indices.push(chunk[2]);
         mesh_3d.indices.push(chunk[1]);
     });
 
-    // 2. Create back face (z = -half_depth) with reversed winding
+    // Back face: keep the input winding (CW from the viewer = CCW from -z).
     let back_offset = mesh_3d.vertices.len() as u32;
     let normal_back = Vec3::new(0.0, 0.0, -1.0);
     mesh_2d.vertices.iter().for_each(|vertex| {
@@ -70,15 +68,12 @@ pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh
             .push(Vec3::new(vertex.x, vertex.y, -half_depth));
         mesh_3d.normals.push(normal_back);
     });
-
-    // Add back face triangles (keep original CW winding so it faces back)
     mesh_2d.indices.chunks_exact(3).for_each(|chunk| {
         mesh_3d.indices.push(back_offset + chunk[0]);
         mesh_3d.indices.push(back_offset + chunk[1]);
         mesh_3d.indices.push(back_offset + chunk[2]);
     });
 
-    // 3. Create side faces
     create_side_faces(&mut mesh_3d, outline, half_depth);
 
     Ok(mesh_3d)
@@ -131,7 +126,6 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
             let p1 = points[next].point;
             let edge_vec = p1 - p0;
 
-            // Skip degenerate edges
             let edge_len_sq = edge_vec.length_squared();
             if edge_len_sq < 1e-10 {
                 continue;
@@ -139,7 +133,6 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
 
             let edge_dir = edge_vec * (1.0 / edge_len_sq.sqrt());
 
-            // Pick the outward perpendicular based on winding.
             let face_normal = if ccw {
                 Vec3::new(edge_dir.y, -edge_dir.x, 0.0) // right perp = outward for CCW
             } else {
@@ -212,11 +205,10 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
 /// # Ok::<(), fontmesh::FontMeshError>(())
 /// ```
 pub fn compute_smooth_normals(mesh: &mut Mesh3D) {
-    // Group vertices by position to find shared vertices
-    let mut position_map: FxHashMap<[i32; 3], Vec<usize>> = FxHashMap::default();
-
-    // Quantize positions for matching (to handle floating point imprecision)
+    // Quantize positions so floating-point imprecision doesn't split
+    // logically-shared vertices when we look up neighbours.
     const QUANTIZE: f32 = 10000.0;
+    let mut position_map: FxHashMap<[i32; 3], Vec<usize>> = FxHashMap::default();
     for (i, vertex) in mesh.vertices.iter().enumerate() {
         let key = [
             (vertex[0] * QUANTIZE) as i32,
@@ -226,7 +218,6 @@ pub fn compute_smooth_normals(mesh: &mut Mesh3D) {
         position_map.entry(key).or_default().push(i);
     }
 
-    // Accumulate normals from all faces using each vertex
     let mut accumulated_normals = vec![Vec3::ZERO; mesh.vertices.len()];
 
     for triangle in mesh.indices.chunks(3) {
@@ -247,27 +238,21 @@ pub fn compute_smooth_normals(mesh: &mut Mesh3D) {
         accumulated_normals[i2] += face_normal;
     }
 
-    // Track which vertices have been processed (for shared positions)
     let mut processed = vec![false; mesh.vertices.len()];
 
-    // Average normals for vertices at the same position
     for indices in position_map.values() {
         if indices.len() <= 1 {
-            // Single vertex at this position - just normalize its accumulated normal
             let idx = indices[0];
             if accumulated_normals[idx] != Vec3::ZERO {
                 mesh.normals[idx] = accumulated_normals[idx].normalize();
                 processed[idx] = true;
             }
         } else {
-            // Multiple vertices at same position - average their normals
             let mut sum = Vec3::ZERO;
             for &idx in indices {
                 sum += accumulated_normals[idx];
             }
             let averaged = sum.normalize();
-
-            // Apply averaged normal to all vertices at this position
             for &idx in indices {
                 mesh.normals[idx] = averaged;
                 processed[idx] = true;
@@ -275,7 +260,6 @@ pub fn compute_smooth_normals(mesh: &mut Mesh3D) {
         }
     }
 
-    // Normalize any remaining normals (shouldn't happen, but be safe)
     for (i, normal) in mesh.normals.iter_mut().enumerate() {
         if !processed[i] && accumulated_normals[i] != Vec3::ZERO {
             *normal = accumulated_normals[i].normalize();
@@ -291,7 +275,6 @@ mod tests {
 
     #[test]
     fn test_extrude_square() {
-        // Create a simple square mesh
         let mesh_2d = Mesh2D {
             vertices: vec![
                 Vec2::new(0.0, 0.0),
@@ -312,7 +295,6 @@ mod tests {
 
         let mesh_3d = extrude(&mesh_2d, &outline, 1.0).expect("Extrusion should succeed");
 
-        // Should have front face, back face, and 4 side faces
         assert!(!mesh_3d.vertices.is_empty());
         assert!(mesh_3d.triangle_count() > 0);
         assert_eq!(mesh_3d.vertices.len(), mesh_3d.normals.len());

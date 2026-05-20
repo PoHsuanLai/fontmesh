@@ -77,11 +77,3 @@ pub fn advance(font: &FontRef, glyph_id: GlyphId) -> Option<f32> {
 pub fn glyph_advance(font: &FontRef, character: char) -> Option<f32> {
     advance(font, glyph_id(font, character)?)
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_font_loading() {
-        // Requires a test font; covered by integration tests.
-    }
-}

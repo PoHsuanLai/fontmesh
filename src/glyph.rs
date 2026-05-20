@@ -1,7 +1,7 @@
-//! Glyph representation and outline extraction
+//! Glyph outline extraction and tessellation.
 //!
-//! In 0.5 the API is glyph-id based. Use [`Font::charmap`] (or [`Font::glyph_id`])
-//! to resolve a `char` to a [`GlyphId`], then call the mesh APIs.
+//! The API is glyph-id based. Use [`crate::glyph_id`] to resolve a `char`
+//! to a [`GlyphId`], then call [`glyph_to_mesh_2d`] or [`glyph_to_mesh_3d`].
 
 use crate::error::{FontMeshError, Result};
 use crate::types::{Contour, ContourPoint, Mesh2D, Mesh3D, Outline2D, Point2D};
@@ -14,10 +14,6 @@ use skrifa::{
 
 /// Default quality for curve linearization (20 subdivisions per curve)
 const DEFAULT_QUALITY: u8 = 20;
-
-// ============================================================================
-// Pure functions
-// ============================================================================
 
 /// Convert a glyph id to a 2D triangle mesh using a parsed font.
 pub fn glyph_to_mesh_2d(font: &FontRef, glyph_id: GlyphId, subdivisions: u8) -> Result<Mesh2D> {
@@ -122,10 +118,6 @@ impl<'a> GlyphMeshBuilder<'a> {
     }
 }
 
-// ============================================================================
-// OutlinePen → Outline2D
-// ============================================================================
-
 /// Outline builder that translates skrifa pen events into our [`Outline2D`]
 /// representation. Y coordinates are flipped because font coordinate space
 /// has Y up at the baseline, while we want the same.
@@ -195,13 +187,5 @@ impl OutlinePen for OutlineExtractor {
 
     fn close(&mut self) {
         self.finish_contour();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_outline_extraction() {
-        // Requires a test font; covered by integration tests.
     }
 }

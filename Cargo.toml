@@ -1,10 +1,10 @@
 [package]
 name = "fontmesh"
-version = "0.5.0-dev"
+version = "0.5.0"
 edition = "2021"
 authors = ["Po Hsuan Lai <pohsuanlai0208@gmail.com>"]
 license = "MIT OR Apache-2.0"
-description = "Pure Rust library for converting TrueType/OpenType font glyphs to 2D/3D triangle meshes"
+description = "Pure Rust library for converting TrueType and OpenType (including CFF/PostScript) font glyphs to 2D/3D triangle meshes"
 repository = "https://github.com/PoHsuanLai/fontmesh"
 readme = "README.md"
 keywords = ["ttf2mesh", "ttf2mesh-rs", "mesh", "ttf", "triangulation"]

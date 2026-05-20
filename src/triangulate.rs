@@ -25,9 +25,6 @@ pub fn triangulate(outline: &Outline2D) -> Result<Mesh2D> {
         ));
     }
 
-    // Pre-allocate buffers based on outline size
-    // Estimate: roughly 4x the number of outline points for vertices
-    // and ~3x vertices for indices (each triangle = 3 indices)
     let point_count: usize = outline.contours.iter().map(|c| c.points.len()).sum();
     let estimated_vertices = point_count * 4;
     let estimated_indices = estimated_vertices * 3;

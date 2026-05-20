@@ -64,20 +64,17 @@ enum LinearizeState {
 fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
     let n = contour.points.len();
     if n < 2 {
-        // Return a new contour with just the points (avoid cloning entire structure)
         let mut result = Contour::new(contour.closed);
         result.points = contour.points.clone();
         return result;
     }
 
-    // Pre-allocate with estimate: most points stay + some subdivisions
     let estimated_size = n + (n / 3) * subdivisions as usize;
     let mut result = Contour::new(contour.closed);
     result.points.reserve(estimated_size);
 
     let first_point = contour.points[0].point;
 
-    // State machine for processing TrueType contour points
     let mut state = LinearizeState::Initial;
 
     for i in 0..n {
@@ -85,7 +82,6 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
 
         state = match state {
             LinearizeState::Initial => {
-                // Initial state - add first point
                 result.push_on_curve(cp.point);
                 LinearizeState::OnCurve {
                     last_point: cp.point,
@@ -114,7 +110,6 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
                 control_point,
             } => {
                 if cp.on_curve {
-                    // on-off-on: emit a quadratic
                     linearize_qbezier(
                         last_point,
                         control_point,
@@ -127,7 +122,8 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
                         last_point: cp.point,
                     }
                 } else {
-                    // on-off-off in a quad chain: insert implicit midpoint
+                    // Two consecutive off-curve points in a quad chain imply
+                    // an on-curve midpoint between them (TrueType convention).
                     let mid = (control_point + cp.point) * 0.5;
                     linearize_qbezier(last_point, control_point, mid, subdivisions, &mut result);
                     result.push_on_curve(mid);
@@ -141,8 +137,6 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
                 last_point,
                 control_point,
             } => {
-                // We expect the second cubic control next; if anything else
-                // shows up the source data is malformed, but degrade gracefully.
                 if !cp.on_curve {
                     LinearizeState::CubicCtrl2 {
                         last_point,
@@ -150,7 +144,8 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
                         control_point_2: cp.point,
                     }
                 } else {
-                    // Treat as a degenerate quadratic to avoid losing geometry.
+                    // Malformed cubic chain; degrade to a quadratic so we
+                    // don't lose the segment.
                     linearize_qbezier(
                         last_point,
                         control_point,
@@ -169,7 +164,6 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
                 control_point_1,
                 control_point_2,
             } => {
-                // Should be on-curve; if not, force-close the cubic to it anyway.
                 linearize_cbezier(
                     last_point,
                     control_point_1,
@@ -186,7 +180,8 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
         };
     }
 
-    // Handle dangling curve at end of an open/closed contour
+    // Flush a dangling curve that ran off the end of a closed contour by
+    // closing it back to the first point.
     match state {
         LinearizeState::QuadCtrl {
             last_point,
@@ -217,14 +212,12 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
         _ => {}
     }
 
-    // Remove collinear points to reduce vertex count
     remove_collinear_points(&mut result);
 
     result
 }
 
-/// Remove near-collinear points from a contour (matches ttf_fix_linear_bags)
-/// Optimized: uses in-place two-pointer algorithm to avoid allocations
+/// Remove near-collinear points from a contour (matches ttf_fix_linear_bags).
 #[inline]
 fn remove_collinear_points(contour: &mut Contour) {
     let n = contour.points.len();
@@ -232,17 +225,13 @@ fn remove_collinear_points(contour: &mut Contour) {
         return;
     }
 
-    // In-place two-pointer algorithm
-    // write_idx tracks where to write the next kept point
-    let mut write_idx = 1; // Start after first point (always kept)
+    let mut write_idx = 1;
 
     for read_idx in 1..n - 1 {
-        // Check if the point at read_idx should be kept
         let p0 = contour.points[write_idx - 1].point;
         let p1 = contour.points[read_idx].point;
         let p2 = contour.points[read_idx + 1].point;
 
-        // Keep point if it forms a non-degenerate triangle
         if triangle_area(p0, p1, p2) > EPSILON {
             if write_idx != read_idx {
                 contour.points[write_idx] = contour.points[read_idx];
@@ -251,16 +240,13 @@ fn remove_collinear_points(contour: &mut Contour) {
         }
     }
 
-    // Always keep last point
     if write_idx != n - 1 {
         contour.points[write_idx] = contour.points[n - 1];
     }
     write_idx += 1;
 
-    // Truncate to the number of kept points
     contour.points.truncate(write_idx);
 
-    // Remove duplicate first/last points if they're too close
     while contour.points.len() > 1 {
         let first = contour.points[0].point;
         let last = contour.points[contour.points.len() - 1].point;
@@ -271,9 +257,7 @@ fn remove_collinear_points(contour: &mut Contour) {
         contour.points.pop();
     }
 
-    // If we have fewer than 3 points left, restore to a minimal valid state
     if contour.points.len() < 3 {
-        // This shouldn't happen in normal cases, but be defensive
         contour.points.truncate(0);
     }
 }
@@ -290,16 +274,13 @@ fn linearize_qbezier(
     subdivisions: u8,
     result: &mut Contour,
 ) {
-    // Check if the curve is nearly linear using triangle area (Heron's formula)
     let area = triangle_area(p0, p1, p2);
     if area < AREA_THRESHOLD {
-        return; // Skip near-linear curves
+        return;
     }
 
-    // Calculate tangent vectors at t=0 and t=1 (inlined for performance)
-    // At t=0: 2(P1-P0)
+    // Tangent vectors at t=0 and t=1.
     let t0 = (p1 - p0) * 2.0;
-    // At t=1: 2(P2-P1)
     let t1 = (p2 - p1) * 2.0;
 
     let t0_len = t0.length();
@@ -309,32 +290,24 @@ fn linearize_qbezier(
         return;
     }
 
-    // Calculate angle between tangents using cross product
     let cross = t0.x * t1.y - t0.y * t1.x;
     let inv_len_product = 1.0 / (t0_len * t1_len);
     let mut angle = (cross.abs() * inv_len_product).min(1.0);
-
-    // Convert to angle
     angle = angle.asin();
 
-    // Calculate number of subdivisions based on angle
+    // Sample density scales with the angle swept by the curve.
     let num_points = (angle / (PI * 2.0) * subdivisions as f32).round() as usize;
-
     if num_points == 0 {
         return;
     }
 
-    // Generate intermediate points
-    // Optimized: batch process 4 points at a time for better CPU utilization
+    // Loop unrolled in batches of 4 to give the inner Bezier eval more ILP.
     let step = 1.0 / (num_points + 1) as f32;
-
-    // Process in batches of 4
     let batch_size = 4;
     let full_batches = num_points / batch_size;
 
     let mut t = step;
     for _ in 0..full_batches {
-        // Compute 4 points in sequence (compiler can optimize this better)
         let t0 = t;
         let t1 = t + step;
         let t2 = t + step * 2.0;
@@ -348,20 +321,17 @@ fn linearize_qbezier(
         t += step * 4.0;
     }
 
-    // Handle remaining points
     (0..(num_points % batch_size)).fold(t, |t, _| {
         result.push_on_curve(qbezier(p0, p1, p2, t));
         t + step
     });
 }
 
-/// Evaluate a quadratic Bezier curve at parameter t
+/// Evaluate a quadratic Bezier curve at parameter t.
 #[inline(always)]
 fn qbezier(p0: Point2D, p1: Point2D, p2: Point2D, t: f32) -> Point2D {
-    // Optimized: reduce multiplications
     let one_minus_t = 1.0 - t;
     let b = one_minus_t * t;
-    // a = (1-t)^2, c = t^2
     p0 * (one_minus_t * one_minus_t) + p1 * (2.0 * b) + p2 * (t * t)
 }
 
@@ -398,15 +368,13 @@ fn cbezier(p0: Point2D, p1: Point2D, p2: Point2D, p3: Point2D, t: f32) -> Point2
     p0 * (omt2 * omt) + p1 * (3.0 * omt2 * t) + p2 * (3.0 * omt * t2) + p3 * (t2 * t)
 }
 
-/// Calculate triangle area using Heron's formula
+/// Calculate triangle area using Heron's formula.
 #[inline(always)]
 fn triangle_area(p0: Point2D, p1: Point2D, p2: Point2D) -> f32 {
-    // Use length_squared to avoid sqrt until the end
     let a_sq = (p0 - p1).length_squared();
     let b_sq = (p1 - p2).length_squared();
     let c_sq = (p2 - p0).length_squared();
 
-    // Fast path for very small triangles
     if a_sq < EPSILON * EPSILON || b_sq < EPSILON * EPSILON || c_sq < EPSILON * EPSILON {
         return 0.0;
     }

@@ -50,26 +50,11 @@ pub mod linearize;
 pub mod triangulate;
 pub mod types;
 
-// Re-export main types
 pub use error::{FontMeshError, Result};
-pub use types::{Mesh2D, Mesh3D, Outline2D};
-
-// Re-export skrifa types for direct usage
-pub use skrifa::{FontRef, GlyphId, MetadataProvider};
-
-// Glyph-id based mesh API
-pub use glyph::{glyph_to_mesh_2d, glyph_to_mesh_3d, GlyphMeshBuilder};
-
-// Font helpers (em-normalised metrics + charmap lookup)
-pub use font::{advance, ascender, descender, glyph_advance, glyph_id, line_gap, parse_font};
-
-// Pipeline stages for advanced usage
 pub use extrude::{compute_smooth_normals, extrude};
+pub use font::{advance, ascender, descender, glyph_advance, glyph_id, line_gap, parse_font};
+pub use glyph::{glyph_to_mesh_2d, glyph_to_mesh_3d, GlyphMeshBuilder};
 pub use linearize::linearize_outline;
+pub use skrifa::{FontRef, GlyphId, MetadataProvider};
 pub use triangulate::triangulate;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_api_compiles() {}
-}
+pub use types::{Mesh2D, Mesh3D, Outline2D};
