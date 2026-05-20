@@ -1,112 +1,46 @@
 //! # fontmesh
 //!
-//! A pure Rust library for converting TrueType font glyphs to 2D and 3D triangle meshes.
+//! Convert font glyphs to 2D and 3D triangle meshes.
 //!
-//! This library provides a **stateless, functional API** for generating triangle meshes from
-//! TrueType fonts. It uses pure functions that work directly with `ttf_parser::Face`,
-//! giving you full control over parsing and caching strategies.
+//! This crate provides a small, stateless API for tessellating glyph outlines
+//! into triangle meshes. Font parsing is handled by [`skrifa`], so both
+//! TrueType (`glyf`) and CFF/PostScript (`CFF`/`CFF2`) outlines are supported,
+//! and the same parsed-font handle plugs straight into shaping libraries like
+//! `cosmic-text`.
 //!
-//! ## Features
-//!
-//! - **Pure Rust**: No C dependencies, fully cross-platform including WASM
-//! - **Stateless API**: Pure functions with no hidden state
-//! - **2D & 3D**: Generate both flat 2D meshes and extruded 3D meshes
-//! - **Quality Control**: Adjustable tessellation quality
-//! - **Efficient**: Uses lyon_tessellation for robust triangulation
-//! - **Flexible**: You control when to parse and cache fonts
-//!
-//! ## Basic Usage
+//! ## Quick start
 //!
 //! ```ignore
-//! use fontmesh::{Face, char_to_mesh_2d, char_to_mesh_3d};
+//! use fontmesh::{parse_font, glyph_id, glyph_to_mesh_3d};
 //!
-//! // Parse the font (this is fast - just table header parsing)
 //! let font_data = include_bytes!("path/to/font.ttf");
-//! let face = Face::parse(font_data, 0)?;
-//!
-//! // Generate a 2D mesh with 20 subdivisions per curve
-//! let mesh_2d = char_to_mesh_2d(&face, 'A', 20)?;
-//!
-//! // Generate a 3D mesh with depth 5.0 and 20 subdivisions
-//! let mesh_3d = char_to_mesh_3d(&face, 'A', 5.0, 20)?;
+//! let font = parse_font(font_data)?;
+//! let gid = glyph_id(&font, 'A').expect("font has 'A'");
+//! let mesh = glyph_to_mesh_3d(&font, gid, 0.1, 20)?;
 //! ```
 //!
-//! ## Caching Strategy
+//! ## API surface
 //!
-//! Because `Face::parse()` is extremely fast (it only reads the table directory), you should **not**
-//! attempt to cache the `Face` struct itself. Doing so is difficult because `Face` borrows the font data.
+//! - Parsing: [`parse_font`] returns a [`skrifa::FontRef`]. It's also exposed
+//!   directly as [`FontRef`] if you want to skip the wrapper.
+//! - Glyph IDs: [`glyph_id`] resolves a `char` → [`GlyphId`]. If you're
+//!   driving fontmesh from a text shaper you already have these IDs and can
+//!   skip the lookup.
+//! - Meshes: [`glyph_to_mesh_2d`] / [`glyph_to_mesh_3d`] or the fluent
+//!   [`GlyphMeshBuilder`].
+//! - Metrics: [`ascender`], [`descender`], [`line_gap`], [`advance`],
+//!   [`glyph_advance`] — all normalised to 1.0 em.
 //!
-//! Instead, simply store your font data (e.g., in a `Vec<u8>` or `Arc<Vec<u8>>`) and parse it on-demand
-//! whenever you need to generate a mesh.
+//! ## Pipeline
 //!
-//! ```ignore
-//! use std::collections::HashMap;
-//! use std::sync::Arc;
-//! use fontmesh::Face;
+//! 1. Parse the font (`FontRef::from_index`)
+//! 2. Extract the glyph outline (skrifa `OutlinePen`)
+//! 3. Linearise curves ([`linearize_outline`])
+//! 4. Triangulate ([`triangulate`])
+//! 5. Optionally extrude to 3D ([`extrude`])
 //!
-//! // Simple cache: just store the font data
-//! let mut font_cache: HashMap<String, Arc<Vec<u8>>> = HashMap::new();
-//! font_cache.insert("myfont".into(), Arc::new(font_data.to_vec()));
-//!
-//! // Parse Face on-demand (fast!)
-//! let data = font_cache.get("myfont").unwrap();
-//! let face = Face::parse(data, 0)?;
-//! let mesh = fontmesh::char_to_mesh_3d(&face, 'A', 5.0, 20)?;
-//! ```
-//!
-//! ## Font Metrics
-//!
-//! Helper functions for common font metrics (normalized to 1.0 em):
-//!
-//! ```ignore
-//! use fontmesh::{Face, ascender, descender, line_gap, glyph_advance};
-//!
-//! let face = Face::parse(font_data, 0)?;
-//!
-//! let asc = ascender(&face);      // Font ascender
-//! let desc = descender(&face);    // Font descender
-//! let gap = line_gap(&face);      // Line gap
-//! let line_height = asc - desc + gap;
-//!
-//! // Get advance width for a character
-//! if let Some(width) = glyph_advance(&face, 'A') {
-//!     println!("'A' advance width: {}", width);
-//! }
-//! ```
-//!
-//! ## Advanced: Pipeline Stages
-//!
-//! The mesh generation pipeline has discrete stages that you can access directly:
-//!
-//! 1. **Parse Font**: `Face::parse()` → Font tables
-//! 2. **Extract Outline**: (internal) → Raw Bezier curves
-//! 3. **Linearization**: (internal) → Straight line segments
-//! 4. **Triangulation**: `triangulate()` → 2D triangle mesh
-//! 5. **Extrusion**: `extrude()` → 3D mesh with depth
-//!
-//! ```ignore
-//! use fontmesh::{Face, triangulate, extrude, Outline2D};
-//!
-//! let face = Face::parse(font_data, 0)?;
-//!
-//! // Lower-level pipeline access (if you need it)
-//! // Most users should just use char_to_mesh_2d/3d
-//! ```
-//!
-//! ## Integration with Text Shaping
-//!
-//! Works seamlessly with text shaping libraries like `rustybuzz` or `cosmic-text`:
-//!
-//! ```ignore
-//! use fontmesh::{Face, GlyphId, char_to_mesh_3d};
-//!
-//! let face = Face::parse(font_data, 0)?;
-//!
-//! // If you have glyph IDs from a shaping library, you can still use
-//! // the Face directly with ttf-parser APIs
-//! let glyph_id = GlyphId(42);
-//! // ... then generate meshes per character as needed
-//! ```
+//! Each stage is exposed publicly so advanced callers can plug their own
+//! glyph source in at step 3.
 
 pub mod error;
 pub mod extrude;
@@ -120,26 +54,22 @@ pub mod types;
 pub use error::{FontMeshError, Result};
 pub use types::{Mesh2D, Mesh3D, Outline2D};
 
-// Re-export ttf-parser types for direct usage
-pub use ttf_parser::{Face, GlyphId};
+// Re-export skrifa types for direct usage
+pub use skrifa::{FontRef, GlyphId, MetadataProvider};
 
-// Re-export core pure functions (stateless API)
-pub use glyph::{char_to_mesh_2d, char_to_mesh_3d, Glyph};
+// Glyph-id based mesh API
+pub use glyph::{glyph_to_mesh_2d, glyph_to_mesh_3d, GlyphMeshBuilder};
 
-// Re-export font utilities
-pub use font::{ascender, descender, glyph_advance, line_gap, parse_font};
+// Font helpers (em-normalised metrics + charmap lookup)
+pub use font::{advance, ascender, descender, glyph_advance, glyph_id, line_gap, parse_font};
 
-// Re-export pipeline functions for advanced usage
+// Pipeline stages for advanced usage
 pub use extrude::{compute_smooth_normals, extrude};
 pub use linearize::linearize_outline;
 pub use triangulate::triangulate;
 
 #[cfg(test)]
 mod tests {
-
-    // Tests will be added when we have test fonts
     #[test]
-    fn test_api_compiles() {
-        // This test just verifies the API compiles
-    }
+    fn test_api_compiles() {}
 }

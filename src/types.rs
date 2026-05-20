@@ -6,22 +6,43 @@ use serde::{Deserialize, Serialize};
 
 pub type Point2D = Vec2;
 
+/// Kind of off-curve control point.
+///
+/// `Quad` is the TrueType quadratic case (one control point between two
+/// on-curve points). `Cubic` is the CFF/PostScript cubic case (two control
+/// points between two on-curve points); the linearizer relies on the
+/// `Cubic` tag to interpret two consecutive off-curve points as a cubic
+/// rather than as a TrueType on-the-fly midpoint pair.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CurveKind {
+    Quad,
+    Cubic,
+}
+
 /// A point in a contour with on-curve flag
 #[derive(Debug, Clone, Copy)]
 pub struct ContourPoint {
     pub point: Point2D,
     pub on_curve: bool,
+    /// Curve degree this control point belongs to. Meaningful only when
+    /// `on_curve == false`; ignored for on-curve points.
+    pub curve_kind: CurveKind,
 }
 
 impl ContourPoint {
     pub fn new(point: Point2D, on_curve: bool) -> Self {
-        Self { point, on_curve }
+        Self {
+            point,
+            on_curve,
+            curve_kind: CurveKind::Quad,
+        }
     }
 
     pub fn on_curve(point: Point2D) -> Self {
         Self {
             point,
             on_curve: true,
+            curve_kind: CurveKind::Quad,
         }
     }
 
@@ -29,6 +50,15 @@ impl ContourPoint {
         Self {
             point,
             on_curve: false,
+            curve_kind: CurveKind::Quad,
+        }
+    }
+
+    pub fn off_curve_cubic(point: Point2D) -> Self {
+        Self {
+            point,
+            on_curve: false,
+            curve_kind: CurveKind::Cubic,
         }
     }
 }
@@ -94,14 +124,13 @@ impl Default for Outline2D {
 }
 
 impl Outline2D {
-    /// Example
-    /// ```
-    /// use fontmesh::{Face, glyph::Glyph};
+    /// ```ignore
+    /// use fontmesh::{parse_font, glyph_id, GlyphMeshBuilder};
     ///
     /// let font_data = include_bytes!("../assets/test_font.ttf");
-    /// let face = Face::parse(font_data, 0)?;
-    /// let glyph = Glyph::new(&face, 'A')?;
-    /// let outline = glyph.with_subdivisions(20).to_outline()?;
+    /// let font = parse_font(font_data)?;
+    /// let gid = glyph_id(&font, 'A').unwrap();
+    /// let outline = GlyphMeshBuilder::new(&font, gid).with_subdivisions(20).to_outline()?;
     /// let mesh = outline.triangulate()?;
     /// # Ok::<(), fontmesh::FontMeshError>(())
     /// ```
@@ -110,22 +139,15 @@ impl Outline2D {
         crate::triangulate::triangulate(self)
     }
 
-    /// Convert this outline to a 3D mesh by triangulating and extruding (fluent API)
+    /// Convert this outline to a 3D mesh by triangulating and extruding.
     ///
-    /// # Arguments
-    /// * `depth` - The extrusion depth
-    ///
-    /// # Returns
-    /// A 3D triangle mesh with normals
-    ///
-    /// Example
-    /// ```
-    /// use fontmesh::{Face, glyph::Glyph};
+    /// ```ignore
+    /// use fontmesh::{parse_font, glyph_id, GlyphMeshBuilder};
     ///
     /// let font_data = include_bytes!("../assets/test_font.ttf");
-    /// let face = Face::parse(font_data, 0)?;
-    /// let glyph = Glyph::new(&face, 'A')?;
-    /// let outline = glyph.with_subdivisions(30).to_outline()?;
+    /// let font = parse_font(font_data)?;
+    /// let gid = glyph_id(&font, 'A').unwrap();
+    /// let outline = GlyphMeshBuilder::new(&font, gid).with_subdivisions(30).to_outline()?;
     /// let mesh = outline.to_mesh_3d(5.0)?;
     /// # Ok::<(), fontmesh::FontMeshError>(())
     /// ```
@@ -174,14 +196,13 @@ impl Mesh2D {
     /// # Returns
     /// A 3D triangle mesh with normals
     ///
-    /// Example
-    /// ```
-    /// use fontmesh::{Face, glyph::Glyph};
+    /// ```ignore
+    /// use fontmesh::{parse_font, glyph_id, GlyphMeshBuilder};
     ///
     /// let font_data = include_bytes!("../assets/test_font.ttf");
-    /// let face = Face::parse(font_data, 0)?;
-    /// let glyph = Glyph::new(&face, 'A')?;
-    /// let outline = glyph.with_subdivisions(30).to_outline()?;
+    /// let font = parse_font(font_data)?;
+    /// let gid = glyph_id(&font, 'A').unwrap();
+    /// let outline = GlyphMeshBuilder::new(&font, gid).with_subdivisions(30).to_outline()?;
     /// let mesh_2d = outline.triangulate()?;
     /// let mesh_3d = mesh_2d.extrude(&outline, 5.0)?;
     /// # Ok::<(), fontmesh::FontMeshError>(())

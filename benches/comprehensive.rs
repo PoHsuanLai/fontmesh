@@ -1,50 +1,60 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use fontmesh::glyph::Glyph;
-use fontmesh::{char_to_mesh_2d, char_to_mesh_3d, Face};
+use fontmesh::{
+    glyph_id, glyph_to_mesh_2d, glyph_to_mesh_3d, parse_font, FontRef, GlyphId, GlyphMeshBuilder,
+};
 
-// Comprehensive benchmark covering all important use cases
+fn id(font: &FontRef, c: char) -> GlyphId {
+    glyph_id(font, c).unwrap_or_else(|| panic!("font is missing '{c}'"))
+}
+
 fn bench_comprehensive(c: &mut Criterion) {
     let font_data = include_bytes!("../assets/test_font.ttf");
     let cursive_data = include_bytes!("../assets/test_font_cursive.ttf");
-    let face = Face::parse(font_data, 0).unwrap();
-    let cursive_face = Face::parse(cursive_data, 0).unwrap();
+    let font = parse_font(font_data).unwrap();
+    let cursive_font = parse_font(cursive_data).unwrap();
+
+    // Resolve all the glyph IDs up front so we benchmark tessellation, not the
+    // charmap lookup. This matches the previous bench's intent — the old API
+    // hid the charmap behind `char_to_mesh_*` but never measured it
+    // separately.
+    let gid_i = id(&font, 'I');
+    let gid_a = id(&font, 'A');
+    let gid_at = id(&font, '@');
+    let gid_a_cursive = id(&cursive_font, 'A');
+    let hello_gids: Vec<GlyphId> = "HELLO".chars().map(|ch| id(&font, ch)).collect();
+    let alphabet_gids: Vec<GlyphId> = ('A'..='Z').map(|ch| id(&font, ch)).collect();
 
     let mut group = c.benchmark_group("fontmesh_comprehensive");
 
     // === Glyph Complexity ===
 
-    // Simple glyphs
     group.bench_function("simple_glyph_2d", |b| {
-        b.iter(|| char_to_mesh_2d(&face, black_box('I'), 20));
+        b.iter(|| glyph_to_mesh_2d(&font, black_box(gid_i), 20));
     });
 
     group.bench_function("simple_glyph_3d", |b| {
-        b.iter(|| char_to_mesh_3d(&face, black_box('I'), black_box(5.0), 20));
+        b.iter(|| glyph_to_mesh_3d(&font, black_box(gid_i), black_box(5.0), 20));
     });
 
-    // Medium complexity
     group.bench_function("medium_glyph_2d", |b| {
-        b.iter(|| char_to_mesh_2d(&face, black_box('A'), 20));
+        b.iter(|| glyph_to_mesh_2d(&font, black_box(gid_a), 20));
     });
 
     group.bench_function("medium_glyph_3d", |b| {
-        b.iter(|| char_to_mesh_3d(&face, black_box('A'), black_box(5.0), 20));
+        b.iter(|| glyph_to_mesh_3d(&font, black_box(gid_a), black_box(5.0), 20));
     });
 
-    // Complex glyphs
     group.bench_function("complex_glyph_2d", |b| {
-        b.iter(|| char_to_mesh_2d(&face, black_box('@'), 20));
+        b.iter(|| glyph_to_mesh_2d(&font, black_box(gid_at), 20));
     });
 
     group.bench_function("complex_glyph_3d", |b| {
-        b.iter(|| char_to_mesh_3d(&face, black_box('@'), black_box(5.0), 20));
+        b.iter(|| glyph_to_mesh_3d(&font, black_box(gid_at), black_box(5.0), 20));
     });
 
-    // Cursive font (very complex)
     group.bench_function("cursive_glyph_2d", |b| {
         b.iter(|| {
-            Glyph::new(&cursive_face, black_box('A'))
-                .unwrap()
+            GlyphMeshBuilder::new(&cursive_font, black_box(gid_a_cursive))
                 .with_subdivisions(black_box(50))
                 .to_mesh_2d()
         });
@@ -52,8 +62,7 @@ fn bench_comprehensive(c: &mut Criterion) {
 
     group.bench_function("cursive_glyph_3d", |b| {
         b.iter(|| {
-            Glyph::new(&cursive_face, black_box('A'))
-                .unwrap()
+            GlyphMeshBuilder::new(&cursive_font, black_box(gid_a_cursive))
                 .with_subdivisions(black_box(50))
                 .to_mesh_3d(black_box(5.0))
         });
@@ -61,14 +70,13 @@ fn bench_comprehensive(c: &mut Criterion) {
 
     // === Quality Levels ===
 
-    for subdivisions in [5, 20, 50] {
+    for subdivisions in [5u8, 20, 50] {
         group.bench_with_input(
             BenchmarkId::new("quality", subdivisions),
             &subdivisions,
             |b, &subdivisions| {
                 b.iter(|| {
-                    Glyph::new(&face, black_box('@'))
-                        .unwrap()
+                    GlyphMeshBuilder::new(&font, black_box(gid_at))
                         .with_subdivisions(black_box(subdivisions))
                         .to_mesh_3d(black_box(5.0))
                 });
@@ -79,48 +87,40 @@ fn bench_comprehensive(c: &mut Criterion) {
     // === Batch Processing (Real-world) ===
 
     group.bench_function("batch_word_2d", |b| {
-        let word = "HELLO";
         b.iter(|| {
-            for ch in word.chars() {
-                let _ = char_to_mesh_2d(&face, black_box(ch), 20);
+            for &gid in &hello_gids {
+                let _ = glyph_to_mesh_2d(&font, black_box(gid), 20);
             }
         });
     });
 
     group.bench_function("batch_word_3d", |b| {
-        let word = "HELLO";
         b.iter(|| {
-            for ch in word.chars() {
-                let _ = char_to_mesh_3d(&face, black_box(ch), black_box(5.0), 20);
+            for &gid in &hello_gids {
+                let _ = glyph_to_mesh_3d(&font, black_box(gid), black_box(5.0), 20);
             }
         });
     });
 
     group.bench_function("batch_alphabet_2d", |b| {
         b.iter(|| {
-            for ch in 'A'..='Z' {
-                let _ = char_to_mesh_2d(&face, black_box(ch), 20);
+            for &gid in &alphabet_gids {
+                let _ = glyph_to_mesh_2d(&font, black_box(gid), 20);
             }
         });
     });
 
     // === Pipeline Stages ===
 
-    group.bench_function("stage_outline", |b| {
-        b.iter(|| Glyph::new(&face, black_box('@')).unwrap().outline());
-    });
-
     group.bench_function("stage_linearize", |b| {
         b.iter(|| {
-            Glyph::new(&face, black_box('@'))
-                .unwrap()
+            GlyphMeshBuilder::new(&font, black_box(gid_at))
                 .with_subdivisions(black_box(20))
                 .to_outline()
         });
     });
 
-    let outline = Glyph::new(&face, '@')
-        .unwrap()
+    let outline = GlyphMeshBuilder::new(&font, gid_at)
         .with_subdivisions(20)
         .to_outline()
         .unwrap();

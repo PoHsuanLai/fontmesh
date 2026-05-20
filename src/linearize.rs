@@ -4,7 +4,7 @@
 //! matching the approach used by ttf2mesh for optimal performance.
 
 use crate::error::Result;
-use crate::types::{Contour, Outline2D, Point2D};
+use crate::types::{Contour, CurveKind, Outline2D, Point2D};
 use std::f32::consts::PI;
 
 const EPSILON: f32 = 1e-5;
@@ -29,17 +29,33 @@ pub fn linearize_outline(outline: Outline2D, subdivisions: u8) -> Result<Outline
     Ok(result)
 }
 
-/// State machine for processing TrueType contour points
+/// State machine for processing contour points.
+///
+/// Supports both TrueType-style quadratic chains (one off-curve between two
+/// on-curve points, with implicit midpoints inserted when two off-curves are
+/// adjacent) and CFF-style cubics (a `Cubic`-tagged pair of off-curve points
+/// between two on-curve points).
 #[derive(Debug, Clone, Copy)]
 enum LinearizeState {
     /// Initial state - expecting first point
     Initial,
     /// Have an on-curve point, expecting next point
     OnCurve { last_point: Point2D },
-    /// Have on-curve + off-curve, expecting end point or another off-curve
-    OffCurve {
+    /// Have on-curve + one quadratic off-curve, expecting end point or another off-curve
+    QuadCtrl {
         last_point: Point2D,
         control_point: Point2D,
+    },
+    /// Have on-curve + first cubic control point, expecting second cubic control
+    CubicCtrl1 {
+        last_point: Point2D,
+        control_point: Point2D,
+    },
+    /// Have on-curve + both cubic control points, expecting end point
+    CubicCtrl2 {
+        last_point: Point2D,
+        control_point_1: Point2D,
+        control_point_2: Point2D,
     },
 }
 
@@ -76,28 +92,29 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
                 }
             }
             LinearizeState::OnCurve { last_point } => {
-                // Have on-curve point, looking for next
                 if cp.on_curve {
-                    // Another on-curve point - add it
                     result.push_on_curve(cp.point);
                     LinearizeState::OnCurve {
                         last_point: cp.point,
                     }
+                } else if cp.curve_kind == CurveKind::Cubic {
+                    LinearizeState::CubicCtrl1 {
+                        last_point,
+                        control_point: cp.point,
+                    }
                 } else {
-                    // Off-curve point - store as control point
-                    LinearizeState::OffCurve {
+                    LinearizeState::QuadCtrl {
                         last_point,
                         control_point: cp.point,
                     }
                 }
             }
-            LinearizeState::OffCurve {
+            LinearizeState::QuadCtrl {
                 last_point,
                 control_point,
             } => {
-                // Have on-curve + off-curve, expecting end point
                 if cp.on_curve {
-                    // Standard curve: on-off-on
+                    // on-off-on: emit a quadratic
                     linearize_qbezier(
                         last_point,
                         control_point,
@@ -110,27 +127,71 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
                         last_point: cp.point,
                     }
                 } else {
-                    // Two consecutive off-curve points: on-off-off
-                    // Insert implicit midpoint
+                    // on-off-off in a quad chain: insert implicit midpoint
                     let mid = (control_point + cp.point) * 0.5;
                     linearize_qbezier(last_point, control_point, mid, subdivisions, &mut result);
                     result.push_on_curve(mid);
-                    LinearizeState::OffCurve {
+                    LinearizeState::QuadCtrl {
                         last_point: mid,
                         control_point: cp.point,
                     }
                 }
             }
+            LinearizeState::CubicCtrl1 {
+                last_point,
+                control_point,
+            } => {
+                // We expect the second cubic control next; if anything else
+                // shows up the source data is malformed, but degrade gracefully.
+                if !cp.on_curve {
+                    LinearizeState::CubicCtrl2 {
+                        last_point,
+                        control_point_1: control_point,
+                        control_point_2: cp.point,
+                    }
+                } else {
+                    // Treat as a degenerate quadratic to avoid losing geometry.
+                    linearize_qbezier(
+                        last_point,
+                        control_point,
+                        cp.point,
+                        subdivisions,
+                        &mut result,
+                    );
+                    result.push_on_curve(cp.point);
+                    LinearizeState::OnCurve {
+                        last_point: cp.point,
+                    }
+                }
+            }
+            LinearizeState::CubicCtrl2 {
+                last_point,
+                control_point_1,
+                control_point_2,
+            } => {
+                // Should be on-curve; if not, force-close the cubic to it anyway.
+                linearize_cbezier(
+                    last_point,
+                    control_point_1,
+                    control_point_2,
+                    cp.point,
+                    subdivisions,
+                    &mut result,
+                );
+                result.push_on_curve(cp.point);
+                LinearizeState::OnCurve {
+                    last_point: cp.point,
+                }
+            }
         };
     }
 
-    // Handle closing curve if we ended with off-curve point
-    if let LinearizeState::OffCurve {
-        last_point,
-        control_point,
-    } = state
-    {
-        if contour.closed {
+    // Handle dangling curve at end of an open/closed contour
+    match state {
+        LinearizeState::QuadCtrl {
+            last_point,
+            control_point,
+        } if contour.closed => {
             linearize_qbezier(
                 last_point,
                 control_point,
@@ -139,6 +200,21 @@ fn linearize_contour(contour: &Contour, subdivisions: u8) -> Contour {
                 &mut result,
             );
         }
+        LinearizeState::CubicCtrl2 {
+            last_point,
+            control_point_1,
+            control_point_2,
+        } if contour.closed => {
+            linearize_cbezier(
+                last_point,
+                control_point_1,
+                control_point_2,
+                first_point,
+                subdivisions,
+                &mut result,
+            );
+        }
+        _ => {}
     }
 
     // Remove collinear points to reduce vertex count
@@ -287,6 +363,39 @@ fn qbezier(p0: Point2D, p1: Point2D, p2: Point2D, t: f32) -> Point2D {
     let b = one_minus_t * t;
     // a = (1-t)^2, c = t^2
     p0 * (one_minus_t * one_minus_t) + p1 * (2.0 * b) + p2 * (t * t)
+}
+
+/// Linearize a cubic Bezier curve using uniform subdivision.
+///
+/// Cubics from CFF/PostScript fonts can curve more sharply than the
+/// per-glyph average, so we don't try to be clever with adaptive angle
+/// estimation here — we just sample uniformly across the curve. The
+/// `remove_collinear_points` pass later prunes any over-sampling.
+#[inline]
+fn linearize_cbezier(
+    p0: Point2D,
+    p1: Point2D,
+    p2: Point2D,
+    p3: Point2D,
+    subdivisions: u8,
+    result: &mut Contour,
+) {
+    let n = subdivisions.max(1) as usize;
+    let step = 1.0 / (n as f32 + 1.0);
+    let mut t = step;
+    for _ in 0..n {
+        result.push_on_curve(cbezier(p0, p1, p2, p3, t));
+        t += step;
+    }
+}
+
+/// Evaluate a cubic Bezier curve at parameter t.
+#[inline(always)]
+fn cbezier(p0: Point2D, p1: Point2D, p2: Point2D, p3: Point2D, t: f32) -> Point2D {
+    let omt = 1.0 - t;
+    let omt2 = omt * omt;
+    let t2 = t * t;
+    p0 * (omt2 * omt) + p1 * (3.0 * omt2 * t) + p2 * (3.0 * omt * t2) + p3 * (t2 * t)
 }
 
 /// Calculate triangle area using Heron's formula
