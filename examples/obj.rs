@@ -1,4 +1,4 @@
-//! Serialize/deserialize meshes (requires --features serde)
+//! Export a glyph mesh to a Wavefront OBJ file.
 
 use fontmesh::{glyph_id, glyph_to_mesh_3d, parse_font};
 
@@ -8,14 +8,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let gid = glyph_id(&font, 'A').expect("font is missing 'A'");
     let mesh = glyph_to_mesh_3d(&font, gid, 5.0, 20)?;
 
-    let json = serde_json::to_string(&mesh)?;
-    let loaded: fontmesh::Mesh3D = serde_json::from_str(&json)?;
+    let mut file = std::fs::File::create("A.obj")?;
+    mesh.write_obj(&mut file)?;
 
-    assert_eq!(mesh.vertices.len(), loaded.vertices.len());
     println!(
-        "Serialized {} vertices to {} bytes",
+        "Wrote A.obj: {} vertices, {} triangles",
         mesh.vertices.len(),
-        json.len()
+        mesh.triangle_count()
     );
     Ok(())
 }

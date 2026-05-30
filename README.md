@@ -50,7 +50,7 @@ let mesh = glyph_to_mesh_3d(&font, gid, 0.1, 20)?;
 
 ```bash
 cargo run --example basic
-cargo run --example serde --features serde
+cargo run --example obj
 ```
 
 ## Performance

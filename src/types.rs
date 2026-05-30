@@ -1,8 +1,8 @@
 //! Core type definitions for fontmesh
 
 use glam::Vec2;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use std::fmt::Write as _;
+use std::io::{self, Write};
 
 pub type Point2D = Vec2;
 
@@ -160,7 +160,6 @@ impl Outline2D {
 
 /// A 2D triangle mesh
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Mesh2D {
     pub vertices: Vec<Point2D>,
     pub indices: Vec<u32>,
@@ -185,6 +184,44 @@ impl Mesh2D {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.vertices.is_empty()
+    }
+
+    /// Write this mesh as a Wavefront OBJ to `w`.
+    ///
+    /// Vertices are emitted as `v x y 0` (the mesh is flat, so z is zero) and
+    /// triangles as `f` lines. OBJ indices are 1-based.
+    ///
+    /// ```ignore
+    /// use fontmesh::{parse_font, glyph_id, glyph_to_mesh_2d};
+    ///
+    /// let font = parse_font(include_bytes!("../assets/test_font.ttf"))?;
+    /// let gid = glyph_id(&font, 'A').unwrap();
+    /// let mesh = glyph_to_mesh_2d(&font, gid, 20)?;
+    /// let mut file = std::fs::File::create("a.obj")?;
+    /// mesh.write_obj(&mut file)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn write_obj<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        for v in &self.vertices {
+            writeln!(w, "v {} {} 0", v.x, v.y)?;
+        }
+        for tri in self.indices.chunks_exact(3) {
+            writeln!(w, "f {} {} {}", tri[0] + 1, tri[1] + 1, tri[2] + 1)?;
+        }
+        Ok(())
+    }
+
+    /// Render this mesh to a Wavefront OBJ string. See [`Mesh2D::write_obj`].
+    #[must_use]
+    pub fn to_obj_string(&self) -> String {
+        let mut s = String::new();
+        for v in &self.vertices {
+            let _ = writeln!(s, "v {} {} 0", v.x, v.y);
+        }
+        for tri in self.indices.chunks_exact(3) {
+            let _ = writeln!(s, "f {} {} {}", tri[0] + 1, tri[1] + 1, tri[2] + 1);
+        }
+        s
     }
 
     /// Extrude this 2D mesh into a 3D mesh (fluent API)
@@ -221,7 +258,6 @@ impl Default for Mesh2D {
 
 /// A 3D triangle mesh with normals
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Mesh3D {
     pub vertices: Vec<glam::Vec3>,
     pub normals: Vec<glam::Vec3>,
@@ -248,6 +284,53 @@ impl Mesh3D {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.vertices.is_empty()
+    }
+
+    /// Write this mesh as a Wavefront OBJ to `w`, including per-vertex normals.
+    ///
+    /// Vertices are emitted as `v x y z`, normals as `vn x y z`, and triangles
+    /// as `f v//vn` lines. Vertex and normal arrays are parallel, so each face
+    /// reuses one index for both. OBJ indices are 1-based.
+    ///
+    /// ```ignore
+    /// use fontmesh::{parse_font, glyph_id, glyph_to_mesh_3d};
+    ///
+    /// let font = parse_font(include_bytes!("../assets/test_font.ttf"))?;
+    /// let gid = glyph_id(&font, 'A').unwrap();
+    /// let mesh = glyph_to_mesh_3d(&font, gid, 5.0, 20)?;
+    /// let mut file = std::fs::File::create("a.obj")?;
+    /// mesh.write_obj(&mut file)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn write_obj<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        for v in &self.vertices {
+            writeln!(w, "v {} {} {}", v.x, v.y, v.z)?;
+        }
+        for n in &self.normals {
+            writeln!(w, "vn {} {} {}", n.x, n.y, n.z)?;
+        }
+        for tri in self.indices.chunks_exact(3) {
+            let (a, b, c) = (tri[0] + 1, tri[1] + 1, tri[2] + 1);
+            writeln!(w, "f {a}//{a} {b}//{b} {c}//{c}")?;
+        }
+        Ok(())
+    }
+
+    /// Render this mesh to a Wavefront OBJ string. See [`Mesh3D::write_obj`].
+    #[must_use]
+    pub fn to_obj_string(&self) -> String {
+        let mut s = String::new();
+        for v in &self.vertices {
+            let _ = writeln!(s, "v {} {} {}", v.x, v.y, v.z);
+        }
+        for n in &self.normals {
+            let _ = writeln!(s, "vn {} {} {}", n.x, n.y, n.z);
+        }
+        for tri in self.indices.chunks_exact(3) {
+            let (a, b, c) = (tri[0] + 1, tri[1] + 1, tri[2] + 1);
+            let _ = writeln!(s, "f {a}//{a} {b}//{b} {c}//{c}");
+        }
+        s
     }
 }
 
