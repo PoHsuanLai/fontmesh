@@ -10,14 +10,31 @@
 //!
 //! ## Quick start
 //!
-//! ```ignore
+//! ```
 //! use fontmesh::{parse_font, glyph_id, glyph_to_mesh_3d};
 //!
-//! let font_data = include_bytes!("path/to/font.ttf");
+//! # let font_data = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/test_font.ttf"));
 //! let font = parse_font(font_data)?;
 //! let gid = glyph_id(&font, 'A').expect("font has 'A'");
 //! let mesh = glyph_to_mesh_3d(&font, gid, 0.1, 20)?;
+//! assert!(!mesh.is_empty());
+//! # Ok::<(), fontmesh::FontMeshError>(())
 //! ```
+//!
+//! ## Coordinate system
+//!
+//! All output coordinates are normalised to **1.0 em**. `(0, 0)` is the glyph
+//! origin (typically the left side of the baseline), +X points right, and +Y
+//! points up. Extrusion depth is also in em units — `depth = 0.1` is 10 % of
+//! the em square. Front faces sit at `z = +depth/2`, back faces at
+//! `z = -depth/2`.
+//!
+//! ## Quality (`subdivisions`)
+//!
+//! The `subdivisions` argument controls how finely Bézier curves are sampled
+//! before triangulation. `20` is a good default; higher values produce
+//! smoother curves at the cost of more vertices. `0` is rejected as
+//! [`FontMeshError::InvalidQuality`].
 //!
 //! ## API surface
 //!
@@ -36,11 +53,13 @@
 //! 1. Parse the font (`FontRef::from_index`)
 //! 2. Extract the glyph outline (skrifa `OutlinePen`)
 //! 3. Linearise curves ([`linearize_outline`])
-//! 4. Triangulate ([`triangulate`])
-//! 5. Optionally extrude to 3D ([`extrude`])
+//! 4. Triangulate ([`triangulate()`])
+//! 5. Optionally extrude to 3D ([`extrude()`])
 //!
 //! Each stage is exposed publicly so advanced callers can plug their own
 //! glyph source in at step 3.
+
+#![warn(missing_docs)]
 
 pub mod error;
 pub mod extrude;

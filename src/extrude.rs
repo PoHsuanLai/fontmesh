@@ -1,11 +1,31 @@
-//! 3D extrusion - converts 2D meshes to 3D with depth
+//! 3D extrusion — converts 2D meshes to 3D with depth.
+//!
+//! Front faces sit at `z = +depth/2`, back faces at `z = -depth/2`, with
+//! side faces connecting outline edges. Side normals are outward for both
+//! TrueType (outer CW) and CFF (outer CCW) winding.
+//!
+//! ```
+//! use fontmesh::{extrude, triangulate};
+//! use fontmesh::types::{Contour, Outline2D, Point2D};
+//!
+//! let mut c = Contour::new(true);
+//! c.push_on_curve(Point2D::new(0.0, 0.0));
+//! c.push_on_curve(Point2D::new(1.0, 0.0));
+//! c.push_on_curve(Point2D::new(1.0, 1.0));
+//! c.push_on_curve(Point2D::new(0.0, 1.0));
+//! let mut outline = Outline2D::new();
+//! outline.add_contour(c);
+//! let mesh_2d = triangulate(&outline).unwrap();
+//! let mesh_3d = extrude(&mesh_2d, &outline, 0.5).unwrap();
+//! assert_eq!(mesh_3d.vertices.len(), mesh_3d.normals.len());
+//! ```
 
 use crate::error::Result;
 use crate::types::{Mesh2D, Mesh3D, Outline2D};
 use glam::Vec3;
 use rustc_hash::FxHashMap;
 
-/// Extrude a 2D mesh into 3D with the given depth
+/// Extrude a 2D mesh into 3D with the given depth.
 ///
 /// Creates a 3D mesh by:
 /// 1. Front face at z = +depth/2
@@ -14,11 +34,24 @@ use rustc_hash::FxHashMap;
 ///
 /// # Arguments
 /// * `mesh_2d` - The 2D triangle mesh to extrude
-/// * `outline` - The original outline (used for edge detection)
-/// * `depth` - The extrusion depth
+/// * `outline` - The linearized outline (used for side-face generation)
+/// * `depth` - Extrusion thickness in em units, centred on z = 0
 ///
-/// # Returns
-/// A 3D triangle mesh with normals
+/// ```
+/// use fontmesh::{extrude, triangulate};
+/// use fontmesh::types::{Contour, Outline2D, Point2D};
+///
+/// let mut c = Contour::new(true);
+/// c.push_on_curve(Point2D::new(0.0, 0.0));
+/// c.push_on_curve(Point2D::new(1.0, 0.0));
+/// c.push_on_curve(Point2D::new(1.0, 1.0));
+/// c.push_on_curve(Point2D::new(0.0, 1.0));
+/// let mut outline = Outline2D::new();
+/// outline.add_contour(c);
+/// let mesh_2d = triangulate(&outline).unwrap();
+/// let mesh_3d = extrude(&mesh_2d, &outline, 1.0).unwrap();
+/// assert!(mesh_3d.triangle_count() > mesh_2d.triangle_count());
+/// ```
 #[inline]
 pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh3D> {
     let half_depth = depth / 2.0;
@@ -180,28 +213,25 @@ fn create_side_faces(mesh_3d: &mut Mesh3D, outline: &Outline2D, half_depth: f32)
     }
 }
 
-/// Compute smooth normals for a mesh (optional post-processing)
+/// Recompute per-vertex normals by averaging adjacent face normals.
 ///
-/// This function recomputes normals by averaging face normals at shared vertices,
-/// resulting in smoother shading. The extrude process already generates smooth normals
-/// for side faces, but this can be used if you want to regenerate them or apply to
-/// a custom mesh.
-///
-/// **Note:** In most cases, you don't need to call this manually - the 3D extrusion
-/// already produces smooth normals.
+/// Positions are quantized so floating-point duplicates (front/back/side
+/// corners that occupy the same point) share a normal. Extrusion already
+/// writes usable normals; call this only if you want smoother shading on a
+/// custom mesh.
 ///
 /// # Arguments
 /// * `mesh` - The mesh to recompute normals for (modified in-place)
 ///
-/// ```ignore
+/// ```
 /// use fontmesh::{parse_font, glyph_id, glyph_to_mesh_3d, compute_smooth_normals};
 ///
-/// let font_data = include_bytes!("../assets/test_font.ttf");
+/// # let font_data = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/test_font.ttf"));
 /// let font = parse_font(font_data)?;
 /// let gid = glyph_id(&font, 'A').unwrap();
-/// let mut mesh = glyph_to_mesh_3d(&font, gid, 5.0, 20)?;
-///
+/// let mut mesh = glyph_to_mesh_3d(&font, gid, 0.2, 20)?;
 /// compute_smooth_normals(&mut mesh);
+/// assert_eq!(mesh.vertices.len(), mesh.normals.len());
 /// # Ok::<(), fontmesh::FontMeshError>(())
 /// ```
 pub fn compute_smooth_normals(mesh: &mut Mesh3D) {
