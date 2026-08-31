@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-08-31
+
+### Added
+
+- Rustdoc on every public item, with runnable examples. docs.rs coverage is now 100% documented and 100% with examples (was 61% / 0%).
+
+### Removed - BREAKING
+
+- `FontMeshError::GlyphNotFound` — never constructed; missing characters already return `None` from `glyph_id`.
+- `FontMeshError::LinearizationFailed` — `linearize_outline` never returned it.
+
+Exhaustive `match`es on `FontMeshError` need those two arms dropped.
+
 ## [0.5.0] - 2026-05-21
 
 ### Changed - BREAKING
