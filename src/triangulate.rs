@@ -1,4 +1,23 @@
-//! 2D triangulation using lyon_tessellation
+//! 2D triangulation using `lyon_tessellation`.
+//!
+//! Outlines are filled with the even-odd rule, which is the usual convention
+//! for TrueType and CFF glyph winding (outer vs hole). The output is a
+//! triangle list with em-normalised vertices.
+//!
+//! ```
+//! use fontmesh::triangulate;
+//! use fontmesh::types::{Contour, Outline2D, Point2D};
+//!
+//! let mut c = Contour::new(true);
+//! c.push_on_curve(Point2D::new(0.0, 0.0));
+//! c.push_on_curve(Point2D::new(1.0, 0.0));
+//! c.push_on_curve(Point2D::new(1.0, 1.0));
+//! c.push_on_curve(Point2D::new(0.0, 1.0));
+//! let mut outline = Outline2D::new();
+//! outline.add_contour(c);
+//! let mesh = triangulate(&outline).unwrap();
+//! assert!(mesh.triangle_count() >= 2);
+//! ```
 
 use crate::error::{FontMeshError, Result};
 use crate::types::{Mesh2D, Outline2D};
@@ -7,16 +26,33 @@ use lyon_tessellation::{
     FillOptions, FillTessellator, FillVertex, GeometryBuilder, VertexBuffers, VertexId,
 };
 
-/// Triangulate a 2D outline into a triangle mesh
+/// Triangulate a 2D outline into a triangle mesh.
 ///
-/// Uses lyon_tessellation to convert the outline polygons into triangles
-/// with proper handling of holes and complex shapes.
+/// Uses `lyon_tessellation` to convert the outline polygons into triangles,
+/// including holes (even-odd fill). The outline should already be linearized
+/// (on-curve points only).
 ///
 /// # Arguments
 /// * `outline` - The linearized outline to triangulate
 ///
-/// # Returns
-/// A 2D triangle mesh
+/// # Errors
+///
+/// Returns [`FontMeshError::TriangulationFailed`] if the outline is empty or
+/// if lyon rejects the path.
+///
+/// ```
+/// use fontmesh::triangulate;
+/// use fontmesh::types::{Contour, Outline2D, Point2D};
+///
+/// let mut c = Contour::new(true);
+/// c.push_on_curve(Point2D::new(0.0, 0.0));
+/// c.push_on_curve(Point2D::new(1.0, 0.0));
+/// c.push_on_curve(Point2D::new(0.0, 1.0));
+/// let mut outline = Outline2D::new();
+/// outline.add_contour(c);
+/// let mesh = triangulate(&outline).unwrap();
+/// assert!(!mesh.is_empty());
+/// ```
 #[inline]
 pub fn triangulate(outline: &Outline2D) -> Result<Mesh2D> {
     if outline.is_empty() {

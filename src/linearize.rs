@@ -1,7 +1,22 @@
-//! Curve linearization - converts Bezier curves to line segments
+//! Curve linearization — converts Bézier curves to line segments.
 //!
-//! This implementation uses adaptive subdivision based on curve angle,
-//! matching the approach used by ttf2mesh for optimal performance.
+//! Quadratic (TrueType) curves use adaptive subdivision based on the angle
+//! between end tangents, matching ttf2mesh. Cubic (CFF) curves are sampled
+//! uniformly; a later collinear-point pass drops over-sampled vertices.
+//!
+//! ```
+//! use fontmesh::linearize_outline;
+//! use fontmesh::types::{Contour, Outline2D, Point2D};
+//!
+//! let mut c = Contour::new(true);
+//! c.push_on_curve(Point2D::new(0.0, 0.0));
+//! c.push_off_curve(Point2D::new(0.5, 1.0));
+//! c.push_on_curve(Point2D::new(1.0, 0.0));
+//! let mut outline = Outline2D::new();
+//! outline.add_contour(c);
+//! let flat = linearize_outline(outline, 16).unwrap();
+//! assert!(flat.contours[0].points.iter().all(|p| p.on_curve));
+//! ```
 
 use crate::error::Result;
 use crate::types::{Contour, CurveKind, Outline2D, Point2D};
@@ -10,11 +25,30 @@ use std::f32::consts::PI;
 const EPSILON: f32 = 1e-5;
 const AREA_THRESHOLD: f32 = 1e-5;
 
-/// Linearize an outline by converting curves to line segments
+/// Linearize an outline by converting Bézier curves to line segments.
+///
+/// Off-curve controls are sampled away; the returned contours contain only
+/// on-curve points. `subdivisions` is the quality knob used by
+/// [`crate::glyph_to_mesh_2d`].
 ///
 /// # Arguments
-/// * `outline` - The outline to linearize
-/// * `subdivisions` - Number of subdivisions per curve
+/// * `outline` - The outline to linearize (consumed)
+/// * `subdivisions` - Target samples per curve; quadratics may use fewer
+///   when the arc is shallow
+///
+/// ```
+/// use fontmesh::linearize_outline;
+/// use fontmesh::types::{Contour, Outline2D, Point2D};
+///
+/// let mut c = Contour::new(true);
+/// c.push_on_curve(Point2D::new(0.0, 0.0));
+/// c.push_on_curve(Point2D::new(1.0, 0.0));
+/// c.push_on_curve(Point2D::new(0.0, 1.0));
+/// let mut outline = Outline2D::new();
+/// outline.add_contour(c);
+/// let flat = linearize_outline(outline, 8).unwrap();
+/// assert_eq!(flat.contours.len(), 1);
+/// ```
 #[inline]
 pub fn linearize_outline(outline: Outline2D, subdivisions: u8) -> Result<Outline2D> {
     let mut result = Outline2D::new();
@@ -258,7 +292,7 @@ fn remove_collinear_points(contour: &mut Contour) {
     }
 
     if contour.points.len() < 3 {
-        contour.points.truncate(0);
+        contour.points.clear();
     }
 }
 
