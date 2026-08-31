@@ -408,7 +408,7 @@ impl Mesh2D {
         for v in &self.vertices {
             writeln!(w, "v {} {} 0", v.x, v.y)?;
         }
-        for tri in self.indices.chunks_exact(3) {
+        for tri in self.indices.as_chunks::<3>().0 {
             writeln!(w, "f {} {} {}", tri[0] + 1, tri[1] + 1, tri[2] + 1)?;
         }
         Ok(())
@@ -430,7 +430,7 @@ impl Mesh2D {
         for v in &self.vertices {
             let _ = writeln!(s, "v {} {} 0", v.x, v.y);
         }
-        for tri in self.indices.chunks_exact(3) {
+        for tri in self.indices.as_chunks::<3>().0 {
             let _ = writeln!(s, "f {} {} {}", tri[0] + 1, tri[1] + 1, tri[2] + 1);
         }
         s
@@ -550,7 +550,7 @@ impl Mesh3D {
         for n in &self.normals {
             writeln!(w, "vn {} {} {}", n.x, n.y, n.z)?;
         }
-        for tri in self.indices.chunks_exact(3) {
+        for tri in self.indices.as_chunks::<3>().0 {
             let (a, b, c) = (tri[0] + 1, tri[1] + 1, tri[2] + 1);
             writeln!(w, "f {a}//{a} {b}//{b} {c}//{c}")?;
         }
@@ -576,7 +576,7 @@ impl Mesh3D {
         for n in &self.normals {
             let _ = writeln!(s, "vn {} {} {}", n.x, n.y, n.z);
         }
-        for tri in self.indices.chunks_exact(3) {
+        for tri in self.indices.as_chunks::<3>().0 {
             let (a, b, c) = (tri[0] + 1, tri[1] + 1, tri[2] + 1);
             let _ = writeln!(s, "f {a}//{a} {b}//{b} {c}//{c}");
         }

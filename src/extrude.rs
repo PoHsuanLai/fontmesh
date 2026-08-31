@@ -86,7 +86,7 @@ pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh
             .push(Vec3::new(vertex.x, vertex.y, half_depth));
         mesh_3d.normals.push(normal_front);
     });
-    mesh_2d.indices.chunks_exact(3).for_each(|chunk| {
+    mesh_2d.indices.as_chunks::<3>().0.iter().for_each(|chunk| {
         mesh_3d.indices.push(chunk[0]);
         mesh_3d.indices.push(chunk[2]);
         mesh_3d.indices.push(chunk[1]);
@@ -101,7 +101,7 @@ pub fn extrude(mesh_2d: &Mesh2D, outline: &Outline2D, depth: f32) -> Result<Mesh
             .push(Vec3::new(vertex.x, vertex.y, -half_depth));
         mesh_3d.normals.push(normal_back);
     });
-    mesh_2d.indices.chunks_exact(3).for_each(|chunk| {
+    mesh_2d.indices.as_chunks::<3>().0.iter().for_each(|chunk| {
         mesh_3d.indices.push(back_offset + chunk[0]);
         mesh_3d.indices.push(back_offset + chunk[1]);
         mesh_3d.indices.push(back_offset + chunk[2]);
